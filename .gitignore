@@ -1,0 +1,9 @@
+# Generated snapshots and downloaded background IQ data (see README "Get the data")
+data/*.npy
+data/*.csv
+data/*_boxes.json
+data/background/
+# Run outputs (logs, scores, retrained models, predictions)
+runs/
+__pycache__/
+*.pyc

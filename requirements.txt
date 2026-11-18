@@ -1,0 +1,8 @@
+# Versions used for the reported results (Python 3.11).
+# Install PyTorch for your platform first (https://pytorch.org); the results used torch 2.14.0 with CUDA 13.
+torch==2.14.0
+numpy==2.4.6
+scipy==1.17.1
+scikit-learn==1.9.1
+matplotlib==3.11.2
+markdown==3.11
