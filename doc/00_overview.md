@@ -164,7 +164,8 @@ rf-exam-anomaly-poc/
 │   ├── background/           배경 노이즈 IQ 파일 3개(릴리스에서 내려받음, 480 MB)
 │   └── <데이터셋>.*          만든 스냅샷: .npy(이미지), .csv(스냅샷 정보), _boxes.json(넣은 신호 위치), 1.3 GB
 ├── doc/
-│   ├── 00_overview.md        이 문서(00_overview.html은 같은 내용의 html)
+│   ├── 00_overview.md        이 문서
+│   ├── 00_overview_rev1.md   이 문서의 표현과 용어를 다듬은 판
 │   ├── fig/                  그림 1–6
 │   └── prior_work.md         선행 조사
 ├── models/                   학습된 모델: cnn_s0–2.pt, cae_s0–2.pt, pixel_stats.npz, thresholds.json(앙상블 눈금 포함)

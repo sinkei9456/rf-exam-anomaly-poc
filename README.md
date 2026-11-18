@@ -10,7 +10,7 @@ Proof-of-concept code that checks, on synthetic data, whether hidden wireless de
 - (D) CAE (convolutional autoencoder): trained on normal snapshots only; the part it cannot reconstruct is the anomaly
 - (E) CNN + CAE ensemble: CNN and CAE scores of the same seed are put on a common scale using validation normal snapshots, and the larger one is used
 
-The full write-up (in Korean) is [doc/00_overview.md](doc/00_overview.md), also available as a web page with a table of contents ([write-up web page](https://sinkei9456.github.io/rf-exam-anomaly-poc/doc/00_overview.html)).
+The full write-up (in Korean) is [doc/00_overview.md](doc/00_overview.md). A copy-edited version with the same content is [doc/00_overview_rev1.md](doc/00_overview_rev1.md).
 
 ## Results
 
@@ -44,7 +44,7 @@ Ranges are the lower and higher values over the two anomaly types (earphone audi
 ```
 rf-exam-anomaly-poc/
 ├── data/background/   background-noise IQ files (download from the release)
-├── doc/               write-up (00_overview.md, .html), figures, prior-work survey
+├── doc/               write-up (00_overview.md, copy-edited 00_overview_rev1.md), figures, prior-work survey
 ├── models/            trained models: 3 CNNs, 3 CAEs, normal statistics, thresholds, ensemble scaling
 ├── results/           reference results reported in the write-up
 ├── src/               training pipeline, inference pipeline, evaluation

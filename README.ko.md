@@ -10,7 +10,7 @@
 - (라) CAE(합성곱 오토인코더): 정상 스냅샷만 학습하고, 복원하지 못한 부분을 이상으로 보는 모델
 - (마) CNN·CAE 앙상블: 같은 시드의 CNN 점수와 CAE 점수를 검증셋 정상으로 같은 눈금에 맞춘 뒤, 둘 중 큰 값을 쓰는 방법
 
-방법과 결과 전체는 [doc/00_overview.md](doc/00_overview.md)에 있습니다. 같은 내용을 왼쪽 목차가 붙은 웹 페이지([문서 웹 페이지](https://sinkei9456.github.io/rf-exam-anomaly-poc/doc/00_overview.html))로도 볼 수 있습니다.
+방법과 결과 전체는 [doc/00_overview.md](doc/00_overview.md)에 있습니다. 같은 내용의 표현과 용어를 다듬은 판은 [doc/00_overview_rev1.md](doc/00_overview_rev1.md)입니다.
 
 ## 결과 요약
 
@@ -44,7 +44,7 @@ recall의 범위는 이상 신호 2종(이어폰형, BLE형)의 값 중 낮은 �
 ```
 rf-exam-anomaly-poc/
 ├── data/background/   배경 노이즈 IQ 파일(릴리스에서 내려받아 여기에 풂)
-├── doc/               전체 정리 문서(00_overview.md, .html), 그림, 선행 조사(prior_work.md)
+├── doc/               전체 정리 문서(00_overview.md, 다듬은 판 00_overview_rev1.md), 그림, 선행 조사(prior_work.md)
 ├── models/            학습된 모델: CNN 3개, CAE 3개, 정상 통계, threshold, 앙상블 눈금
 ├── results/           문서에 적은 기준 결과(재현할 때 비교용)
 ├── src/               학습 파이프라인, 추론 파이프라인, 평가 코드
