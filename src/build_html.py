@@ -6,6 +6,9 @@
 * 목록 앞에 빈 줄이 없으면 넣고, 공백 2-3칸으로 들여쓴 하위 목록은 4칸으로 바꾼다(html 쪽만).
 * 왼쪽에 목차(## 절과 ### 소절)를 둔다. 누르면 그 절로 가고, 화면을 내려도 목차는 그 자리에 있으며
   지금 읽는 절을 진하게 표시한다. 폭이 좁은 화면(1,100 px 미만)에서는 본문 위에 접을 수 있는 목차로 나온다.
+* 절 주소(id)는 영문·숫자만 쓴다: "4.5 (마) ..." → s4-5, 번호 없는 제목 → h. 코드 서버(VS Code) 미리보기는 링크의 href 글자가
+  브라우저가 계산한 # 뒷부분과 똑같을 때만 문서 안에서 이동하고, 다르면 바깥 새 탭으로 연다. 한글 주소는 %EB%A7%88 처럼 바뀌어
+  달라지므로 쓰면 안 된다(2026-11-18 고침). 클릭 처리 JS 도 코드 서버 처리기까지 클릭이 가지 않게 막는다(stopPropagation).
 
 실행: python src/build_html.py   (requirements.txt 의 markdown 모듈이 필요)
 00_overview.md 를 고친 뒤에는 다시 돌린다.
@@ -15,7 +18,6 @@ import re
 from pathlib import Path
 
 import markdown
-from markdown.extensions.toc import slugify_unicode
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "doc" / "00_overview.md"
@@ -82,11 +84,12 @@ SCRIPT = """
   }
   window.addEventListener('scroll',mark,{passive:true}); window.addEventListener('resize',mark);
   window.addEventListener('load',function(){mark(); setTimeout(mark,150);}); window.addEventListener('hashchange',function(){setTimeout(mark,50);});
-  // 목차를 누르면 페이지를 이동하지 않고 그 절로 화면만 내린다. 편집기 미리보기처럼 이동을 막는 창에서 새 탭이 열리지 않게 한다.
+  // 목차를 누르면 페이지를 이동하지 않고 그 절로 화면만 내린다. 코드 서버 미리보기는 창 단위 클릭 처리기가 링크를 바깥 새 탭으로
+  // 열 수 있어서, 클릭이 그 처리기까지 가지 않게 막는다(stopPropagation).
   links.forEach(function(a,i){
     a.addEventListener('click',function(e){
       var h=heads[i]; if(!h){return;}
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation();
       h.scrollIntoView({behavior:'instant',block:'start'});
       try{ history.replaceState(null,'','#'+encodeURIComponent(h.id)); }catch(err){}
       mark();
@@ -96,6 +99,12 @@ SCRIPT = """
 })();
 """
 LIST = re.compile(r"^(\s*)([-*]|\d+\.)\s")
+
+
+def ascii_id(value, separator):
+    """제목 → 영문·숫자 주소. "4.5 (마) CNN·CAE 앙상블" → s4-5, "0. 한눈에 보기" → s0, 번호 없는 제목 → h(겹치면 toc 가 _1 을 붙인다)."""
+    m = re.match(r"\s*(\d+(?:\.\d+)*)", value)
+    return "s" + m.group(1).replace(".", "-") if m else "h"
 
 
 def md_fix(text):
@@ -123,7 +132,7 @@ def build(md_path):
                 f"<figcaption>{caption}</figcaption></figure>")
 
     md = markdown.Markdown(extensions=["tables", "sane_lists", "fenced_code", "toc"],
-                           extension_configs={"toc": {"slugify": slugify_unicode, "toc_depth": "2-3"}})
+                           extension_configs={"toc": {"slugify": ascii_id, "toc_depth": "2-3"}})
     html = md.convert(md_fix(md_path.read_text(encoding="utf-8")))
     html = re.sub(r'<p><img alt="([^"]*)" src="([^"]+)"\s*/?></p>\s*<p>((?:<strong>)?그림 .*?)</p>', embed, html, flags=re.S)
     if re.search(r'<img [^>]*src="(?!data:)', html):
