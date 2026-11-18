@@ -5,6 +5,7 @@
   pixel: (나) 정상 평균과의 픽셀차의 평활 크기(rows 줄 × cols 칸)와 threshold 두 가지(검증셋 정상의 1 %·0.1 %가 넘는 값)
   cnn:   시드마다 threshold, 고른 에포크, 에포크별 검증 기록
   cae:   시드마다 평활 크기, threshold, 고른 에포크, 에포크별 검증 기록
+  ens:   시드마다 눈금 맞춤 값(CNN·CAE 검증셋 정상 점수의 중앙값과 1 %가 넘는 값), threshold
 저장소의 models/ 는 2026-11-18 학습 결과를 이 스크립트로 내보낸 것이다.
 사용: python src/export_models.py   (다시 학습한 모델로 models/ 를 바꿀 때)
 """
@@ -21,12 +22,15 @@ def main():
     ps = json.load(open(C.RUNS / "pixel_select.json", encoding="utf-8"))["B"]
     cs = json.load(open(C.RUNS / "cnn_select.json", encoding="utf-8"))
     es = json.load(open(C.RUNS / "cae_select.json", encoding="utf-8"))
+    ns = json.load(open(C.RUNS / "ens_select.json", encoding="utf-8"))
     meta = {
         "input": dict(fs_hz=C.FS, snapshot_s=C.WIN, center_hz=C.FC, image="uint8 256 x 97, 0 = -6 dB, 255 = +34 dB, noise floor = 0 dB"),
         "pixel": dict(rows=ps["rows"], cols=ps["cols"], thr={"0.01": ps["thr_fpr1"], "0.001": ps["thr_fpr01"]}),
         "cnn": {s: dict(thr={"0.01": v["thr_fpr1"], "0.001": v["thr_fpr01"]}, best_epoch=v["best_epoch"], history=v["history"]) for s, v in cs.items()},
         "cae": {s: dict(rows=v["rows"], cols=v["cols"], thr={"0.01": v["thr_fpr1"], "0.001": v["thr_fpr01"]},
                         best_epoch=v["best_epoch"], history=v["history"]) for s, v in es.items()},
+        "ens": {s: dict(cnn_med=v["cnn_med"], cnn_q99=v["cnn_q99"], cae_med=v["cae_med"], cae_q99=v["cae_q99"],
+                        thr={"0.01": v["thr_fpr1"], "0.001": v["thr_fpr01"]}) for s, v in ns.items()},
     }
     json.dump(meta, open(C.MODELS / "thresholds.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print("models/ 에 내보냄:", sorted(p.name for p in C.MODELS.iterdir()))

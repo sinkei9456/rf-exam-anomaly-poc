@@ -38,7 +38,7 @@ if _kf: plt.rcParams["font.family"] = _kf
 plt.rcParams["axes.unicode_minus"] = False
 
 SNRS = [0, 3, 6, 9, 12]
-NAME = {"A": "(가) 직전 스냅샷과의 픽셀차", "B": "(나) 정상 평균과의 픽셀차", "CNN": "(다) CNN", "CAE": "(라) CAE"}
+NAME = {"A": "(가) 직전 스냅샷과의 픽셀차", "B": "(나) 정상 평균과의 픽셀차", "CNN": "(다) CNN", "CAE": "(라) CAE", "ENS": "(마) CNN·CAE 앙상블"}
 EXT = [(C.NFFT / 2 - C.HOP / 2) / C.FS * 1e3, ((C.NT - 1) * C.HOP + C.NFFT / 2 + C.HOP / 2) / C.FS * 1e3, (C.FC - C.FS / 2) / 1e6, (C.FC + C.FS / 2) / 1e6]
 
 
@@ -52,7 +52,8 @@ def read_csv(name):
     return out
 
 
-LEARNED = {"CNN": ("C", "scores_cnn.npz", "cnn_select.json"), "CAE": ("E", "scores_cae.npz", "cae_select.json")}   # 시드 여러 개인 학습 모델
+LEARNED = {"CNN": ("C", "scores_cnn.npz", "cnn_select.json"), "CAE": ("E", "scores_cae.npz", "cae_select.json"),
+           "ENS": ("N", "scores_ens.npz", "ens_select.json")}   # 시드 여러 개인 모델(앙상블은 CNN 시드 k + CAE 시드 k)
 
 
 def load_scores():
@@ -119,9 +120,13 @@ def write_md(R, ps, sel, ev):
         L.append(f"| {NAME[m]} | 평활 {ps[m]['rows']}줄 × {ps[m]['cols']}칸 ({ps[m]['rows'] * C.DF_ROW / 1e6:.2f} MHz × {ps[m]['cols'] * C.DT_COL * 1e3:.1f} ms) | {ps[m]['thr_fpr1']:.2f} | {ps[m]['thr_fpr01']:.2f} |")
     for g in G:
         for s in sorted(sel[g]):
-            v = sel[g][s]; h = v["history"][v["best_epoch"] - 1]
-            what = (f"에포크 {v['best_epoch']} (검증 recall {h['val_recall_fpr1'] * 100:.1f} %)" if g == "CNN" else
-                    f"에포크 {v['best_epoch']} (검증 정상 복원 오차 {h['val_loss']:.4f}), 평활 {v['rows']}줄 × {v['cols']}칸")
+            v = sel[g][s]
+            if g == "ENS":
+                what = f"CNN 눈금(중앙값 {v['cnn_med']:.3f}, 1 % 값 {v['cnn_q99']:.3f}), CAE 눈금(중앙값 {v['cae_med']:.4f}, 1 % 값 {v['cae_q99']:.4f})"
+            else:
+                h = v["history"][v["best_epoch"] - 1]
+                what = (f"에포크 {v['best_epoch']} (검증 recall {h['val_recall_fpr1'] * 100:.1f} %)" if g == "CNN" else
+                        f"에포크 {v['best_epoch']} (검증 정상 복원 오차 {h['val_loss']:.4f}), 평활 {v['rows']}줄 × {v['cols']}칸")
             L.append(f"| {NAME[g]} 시드 {s} | {what} | {v['thr_fpr1']:.3f} | {v['thr_fpr01']:.3f} |")
     def rows(f, fmt=pct, rng=True):
         out = [f"| {NAME[m]} | " + " | ".join(fmt(f(R[m], s)) for s in SNRS) + " |" for m in ("A", "B")]
@@ -215,7 +220,7 @@ def fig2(ev, ps):
     fig.savefig(C.FIG / "fig2_pixeldiff_steps.png", dpi=130); plt.close(fig)
 
 
-COL = {"A": "#1f77b4", "B": "#ff7f0e", "CNN": "#2ca02c", "CAE": "#9467bd"}
+COL = {"A": "#1f77b4", "B": "#ff7f0e", "CNN": "#2ca02c", "CAE": "#9467bd", "ENS": "#d62728"}
 
 
 def fig3(R):
@@ -229,7 +234,7 @@ def fig3(R):
             for g in groups(R):
                 pre = LEARNED[g][0]
                 v = np.array([[R[m][fpr]["cells"][f"{kind}_{s}"]["recall"] for s in SNRS] for m in R if m[0] == pre and m[1:].isdigit()])
-                ax.plot(SNRS, v.mean(0), ls, marker="s" if g == "CNN" else "^", color=COL[g], label=f"{NAME[g]} (시드 3개 평균)" if fpr == 0.01 else None)
+                ax.plot(SNRS, v.mean(0), ls, marker={"CNN": "s", "CAE": "^", "ENS": "D"}[g], color=COL[g], label=f"{NAME[g]} (시드 3개 평균)" if fpr == 0.01 else None)
                 ax.fill_between(SNRS, v.min(0), v.max(0), color=COL[g], alpha=0.15)
         ax.set_title(f"테스트 이상 {kind}: {C.ANOM[kind]['name']}", fontsize=10); ax.set_xlabel("이상 신호 SNR (dB)"); ax.set_ylabel("스냅샷 recall"); ax.set_ylim(-0.02, 1.08); ax.set_xticks(SNRS); ax.grid(alpha=0.3)
     from matplotlib.lines import Line2D
@@ -241,10 +246,10 @@ def fig3(R):
 
 
 def fig4(M):
-    """1시간 시연 스트림의 이상 점수: (나), CNN 시드 0, CAE 시드 0. 위 3줄은 1시간 전체, 아래 3줄은 이벤트 앞뒤 확대."""
+    """1시간 시연 스트림의 이상 점수: (나), CNN 시드 0, CAE 시드 0, 앙상블 시드 0. 위 3줄은 1시간 전체, 아래 3줄은 이벤트 앞뒤 확대."""
     from make_data import DEMO_EVENTS
     dm = read_csv("test_demo"); t = np.arange(len(dm["idx"]))
-    rows = [(m, nm) for m, nm in (("B", "B"), ("C0", "CNN"), ("E0", "CAE")) if m in M]
+    rows = [(m, nm) for m, nm in (("B", "B"), ("C0", "CNN"), ("E0", "CAE"), ("N0", "ENS")) if m in M]
     fig = plt.figure(figsize=(15, 4.4 * len(rows)), constrained_layout=True); gs = fig.add_gridspec(2 * len(rows), 3)
     for ri, (m, nm) in enumerate(rows):
         ax = fig.add_subplot(gs[ri, :]); s = M[m]["s"]["test_demo"]
@@ -266,10 +271,10 @@ def fig4(M):
 
 
 def fig5(M):
-    """테스트셋 정상 스트림에서 점수가 가장 높았던 정상 스냅샷(오경보) 3장씩: (나), CNN 시드 0, CAE 시드 0."""
+    """테스트셋 정상 스트림에서 점수가 가장 높았던 정상 스냅샷(오경보) 3장씩: (나), CNN 시드 0, CAE 시드 0, 앙상블 시드 0."""
     X = np.load(C.DATA / "test_normal.npy", mmap_mode="r"); Bx = json.load(open(C.DATA / "test_normal_boxes.json"))
     P = np.load(C.RUNS / "scores_pixel.npz")
-    rows = [(m, nm) for m, nm in (("B", "B"), ("C0", "CNN"), ("E0", "CAE")) if m in M]
+    rows = [(m, nm) for m, nm in (("B", "B"), ("C0", "CNN"), ("E0", "CAE"), ("N0", "ENS")) if m in M]
     fig, axs = plt.subplots(len(rows), 3, figsize=(13, 3.6 * len(rows)), constrained_layout=True)
     for ri, (m, nm) in enumerate(rows):
         s = M[m]["s"]["test_normal"]; top = np.argsort(-np.nan_to_num(s, nan=-1e9))[:3]

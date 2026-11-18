@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
 
-NAME = {"A": "(가) 직전 스냅샷과의 픽셀차", "B": "(나) 정상 평균과의 픽셀차", "C": "(다) CNN", "E": "(라) CAE"}
+NAME = {"A": "(가) 직전 스냅샷과의 픽셀차", "B": "(나) 정상 평균과의 픽셀차", "C": "(다) CNN", "E": "(라) CAE", "N": "(마) CNN·CAE 앙상블"}
 
 
 def flat(r):

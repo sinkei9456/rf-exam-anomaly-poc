@@ -2,18 +2,19 @@
 
 English | [한국어](README.ko.md)
 
-Proof-of-concept code that checks, on synthetic data, whether hidden wireless devices used for exam cheating (Bluetooth earphones, AI glasses) can be found in receiver spectrograms. Four anomaly detection methods that learn the normal state and flag deviations are compared:
+Proof-of-concept code that checks, on synthetic data, whether hidden wireless devices used for exam cheating (Bluetooth earphones, AI glasses) can be found in receiver spectrograms. Five anomaly detection methods that learn the normal state and flag deviations are compared:
 
 - (A) pixel difference to the previous snapshot
 - (B) pixel difference to the per-pixel normal mean (z-score)
 - (C) CNN: a classifier trained to separate normal snapshots from normal snapshots with synthetic rectangular energy blobs
 - (D) CAE (convolutional autoencoder): trained on normal snapshots only; the part it cannot reconstruct is the anomaly
+- (E) CNN + CAE ensemble: CNN and CAE scores of the same seed are put on a common scale using validation normal snapshots, and the larger one is used
 
 The full write-up (in Korean) is [doc/00_overview.md](doc/00_overview.md), also available as a web page with a table of contents ([write-up web page](https://sinkei9456.github.io/rf-exam-anomaly-poc/doc/00_overview.html)).
 
 ## Results
 
-Background noise is 3 s of signal-free IQ data recorded in a park. Weak Wi-Fi and Bluetooth bursts (normal) and two unseen Bluetooth patterns (anomalies) are synthesized on top. Test-set results below use a threshold (the score above which a snapshot is called anomalous) set so that only 0.1 % of the validation normal snapshots (5 of 5,000) exceed it; CNN and CAE are means over 3 seeds.
+Background noise is 3 s of signal-free IQ data recorded in a park. Weak Wi-Fi and Bluetooth bursts (normal) and two unseen Bluetooth patterns (anomalies) are synthesized on top. Test-set results below use a threshold (the score above which a snapshot is called anomalous) set so that only 0.1 % of the validation normal snapshots (5 of 5,000) exceed it; CNN, CAE and the ensemble are means over 3 seeds.
 
 - FPR: fraction of normal snapshots flagged as anomalous
 - recall: fraction of snapshots with a visible cheating-device signal that are flagged
@@ -27,13 +28,15 @@ Background noise is 3 s of signal-free IQ data recorded in a park. Weak Wi-Fi an
 | (B) normal-mean difference | 0.11 | 0.0–0.6 | 0.0–0.3 | 2.7–56.5 | 70.9–92.6 |
 | (C) CNN | 0.30 | 89.4–95.5 | 90.7–92.8 | 93.5–95.2 | 94.6–96.7 |
 | (D) CAE | 0.05 | 0.0–2.2 | 18.4–41.2 | 73.9–76.8 | 85.4–91.9 |
+| (E) CNN + CAE ensemble | 0.28 | 88.9–95.3 | 89.9–93.6 | 93.8–96.0 | 94.4–97.4 |
 
 Ranges are the lower and higher values over the two anomaly types (earphone audio streaming, BLE data streaming).
 
 - Pixel differences only find anomalies stronger than the normal signals.
 - The CAE, trained on normal data only, reaches about 3 dB weaker signals than the pixel differences and has the fewest false alarms.
 - The CNN finds anomalies at almost any SNR, but its synthetic training blobs cover the size of the test packets, which favors it over the CAE.
-- The receiver sees only 20 MHz, so 17–40 % of snapshots show nothing even while a device transmits. Decisions are therefore made over 10 s ("alarm if 2 of the last 10 snapshots are anomalous"). With this rule the false alarms per hour were 0–1.3 (CNN) and 0 (CAE).
+- The ensemble performed like the CNN (recall within 1 percentage point) with slightly less seed-to-seed variation in false alarms. The test signals lie inside the size range the CNN was trained on, so the CAE had little to add.
+- The receiver sees only 20 MHz, so 17–40 % of snapshots show nothing even while a device transmits. Decisions are therefore made over 10 s ("alarm if 2 of the last 10 snapshots are anomalous"). With this rule the false alarms per hour were 0–1.3 (CNN), 0 (CAE) and 0–0.7 (ensemble).
 - All results are on synthetic data. Nothing has been verified in a real exam room.
 
 ## Repository layout
@@ -42,7 +45,7 @@ Ranges are the lower and higher values over the two anomaly types (earphone audi
 rf-exam-anomaly-poc/
 ├── data/background/   background-noise IQ files (download from the release)
 ├── doc/               write-up (00_overview.md, .html), figures, prior-work survey
-├── models/            trained models: 3 CNNs, 3 CAEs, normal statistics, thresholds
+├── models/            trained models: 3 CNNs, 3 CAEs, normal statistics, thresholds, ensemble scaling
 ├── results/           reference results reported in the write-up
 ├── src/               training pipeline, inference pipeline, evaluation
 ├── requirements.txt
@@ -86,8 +89,9 @@ bash src/run_all.sh --use-released-models   # skip training, score with models/ 
 | 2 | src/pixeldiff.py | (A)(B): pick smoothing size and thresholds on the validation set, score | ~1 min |
 | 3 | src/cnn.py | (C) CNN training, 3 seeds | ~20 min |
 | 4 | src/cae.py | (D) CAE training, 3 seeds | ~5 min |
-| 5 | src/evaluate.py | test-set evaluation, tables (runs/results.md), figures (doc/fig/) | ~2 min |
-| 6 | src/compare_results.py | compare with the reference results (results/) | seconds |
+| 5 | src/ensemble.py | (E) ensemble: scale CNN/CAE scores on validation normals, take the larger; no training | seconds |
+| 6 | src/evaluate.py | test-set evaluation, tables (runs/results.md), figures (doc/fig/) | ~3 min |
+| 7 | src/compare_results.py | compare with the reference results (results/) | seconds |
 
 Use `PY=/path/python` to choose the interpreter and `WORKERS` (default 16) for data generation. Existing data/*.npy files are reused. After retraining, `python src/export_models.py` copies the new models into models/.
 
@@ -98,6 +102,7 @@ src/predict.py runs with the files in models/ only. To get just the trained mode
 ```
 python src/make_demo_iq.py
 python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy --model cnn
+python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy --model ens
 ```
 
 | Input option | Meaning |
@@ -108,8 +113,8 @@ python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy 
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--model` | cnn | cnn = (C), cae = (D), pixel = (B) |
-| `--seed` | 0 | CNN/CAE seed (0, 1, 2) |
+| `--model` | cnn | cnn = (C), cae = (D), ens = (E) ensemble, pixel = (B) |
+| `--seed` | 0 | CNN/CAE/ensemble seed (0, 1, 2); ensemble seed k combines CNN seed k and CAE seed k |
 | `--fpr` | 0.001 | which threshold to use: 0.001 = exceeded by 0.1 % of the validation normal snapshots, 0.01 = exceeded by 1 % |
 | `--noise-ref FILE` | none | normal IQ data used to normalize the noise power (recommended: same site and receiver settings) |
 | `--k`, `--n` | 2, 10 | alarm when k of the last n snapshots are anomalous |
@@ -122,10 +127,19 @@ For your own recordings, keep the receiver settings of the training data (HackRF
 
 Both paths were run from a fresh copy of this repository and compared with results/ (NVIDIA DGX Spark GB10, ARM CPU, Python 3.11, PyTorch 2.14, CUDA 13).
 
-- With the released models (`--use-released-models`): all 52 metrics of all 8 models were identical, as were the synthetic data and pixel-difference results.
-- Full retraining (`bash src/run_all.sh`): pixel-difference results were identical; CNN and CAE numbers changed slightly even on the same machine. Per seed, single metrics differed by up to 12.7 percentage points for the CNN (seed 1 picked epoch 16 instead of 11) and 2.7 points for the CAE.
-- The 3-seed means used in the write-up moved much less: recall by up to 2.9 points (CNN) and 1.2 points (CAE); event recall was unchanged for the CNN and moved up to 1.7 points for the CAE.
-- FPR went from 0.30 % to 0.33 % (CNN) and from 0.05 % to 0.06 % (CAE). False alarms per hour (2-of-10 rule) went from 0.5 to 0.8 for the CNN (up to 1.8 for one seed) and stayed 0 for the CAE. The conclusions do not change.
+- With the released models (`--use-released-models`): all 52 metrics of all 11 models (including the 3 ensembles) were identical, as were the synthetic data and pixel-difference results.
+- Full retraining (`bash src/run_all.sh`): pixel-difference results were identical; CNN, CAE and ensemble numbers changed slightly even on the same machine. Per seed, a single metric differed by up to 9.3 percentage points (CNN seed 0). The epoch the CNN picked on the validation set also changed for seeds 0 and 2.
+- The 3-seed means used in the write-up moved much less (table below). After retraining, ensemble recall was still within 1.2 points of the CNN. The conclusions do not change.
+
+Full retraining vs. reference results (3-seed means; threshold exceeded by 0.1 % of validation normal snapshots)
+
+| Model | Largest snapshot recall difference (points) | Largest event recall difference (points) | Test FPR, reference (%) | Test FPR, retrained (%) | Alarms per hour on the normal stream, reference | Alarms per hour on the normal stream, retrained |
+|---|---:|---:|---:|---:|---:|---:|
+| (C) CNN | 2.7 | 0.0 | 0.30 | 0.27 | 0.5 | 0.4 |
+| (D) CAE | 0.5 | 1.7 | 0.05 | 0.05 | 0.0 | 0.0 |
+| (E) CNN + CAE ensemble | 2.2 | 0.0 | 0.29 | 0.18 | 0.4 | 0.2 |
+
+Recall differences are taken per anomaly type and SNR, and the largest is shown. Alarms use the 2-of-10 rule (an alarm when at least 2 of the last 10 snapshots are anomalous).
 
 PyTorch does not guarantee bit-identical GPU training across runs or hardware, so CNN/CAE numbers can differ slightly; use src/compare_results.py to check.
 

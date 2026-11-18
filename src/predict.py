@@ -4,7 +4,8 @@
   cnn_s0.pt, cnn_s1.pt, cnn_s2.pt   (다) CNN 가중치(시드 0·1·2)
   cae_s0.pt, cae_s1.pt, cae_s2.pt   (라) CAE(합성곱 오토인코더) 가중치(시드 0·1·2)
   pixel_stats.npz                   학습셋 정상 스냅샷 10,000장의 픽셀별 평균·표준편차(dB). CNN·CAE 입력과 (나) 픽셀차에 씀
-  thresholds.json                   threshold 두 가지(검증셋 정상 스냅샷의 1 %·0.1 %가 넘는 값), 평활 크기, 학습 기록
+  thresholds.json                   threshold 두 가지(검증셋 정상 스냅샷의 1 %·0.1 %가 넘는 값), 평활 크기, 학습 기록,
+                                    (마) 앙상블의 눈금 맞춤 값(검증셋 정상 점수의 중앙값과 1 %가 넘는 값)
 
 입력(셋 중 하나):
   --iq FILE         IQ 데이터. 20 MS/s 로 1초에 한 번 받은 20 ms 조각(400,000 표본)을 시간 순서대로 이어 붙인 파일.
@@ -18,8 +19,9 @@
   주지 않으면 입력에서 센 표본(평균 전력의 10배 넘는 것)을 뺀 평균 전력으로 맞추고 경고를 낸다.
 
 판정:
-  --model cnn|cae|pixel  cnn = (다) CNN(기본), cae = (라) CAE, pixel = (나) 정상 평균과의 픽셀차
-  --seed 0|1|2       CNN·CAE 시드(기본 0)
+  --model cnn|cae|ens|pixel  cnn = (다) CNN(기본), cae = (라) CAE, ens = (마) CNN·CAE 앙상블, pixel = (나) 정상 평균과의 픽셀차
+                     앙상블은 같은 시드의 CNN·CAE 점수를 검증셋 정상으로 눈금 맞춤한 뒤 큰 값을 쓴다(src/ensemble.py).
+  --seed 0|1|2       CNN·CAE·앙상블 시드(기본 0). 앙상블 시드 k = CNN 시드 k + CAE 시드 k
   --fpr 0.001|0.01   0.001 = 검증셋 정상 스냅샷의 0.1 %가 넘게 정한 threshold(기본), 0.01 = 1 %가 넘게 정한 threshold
   --k 2 --n 10       최근 n 장 중 k 장 이상이 이상이면 경보(기본 10장 중 2장)
   --interval 1.0     스냅샷 사이 간격(초). 출력의 시각 칸에만 쓴다.
@@ -29,6 +31,7 @@
 예:
   python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy
   python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy --model cae
+  python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy --model ens
   python src/predict.py --snapshots data/test_demo.npy
   python src/predict.py --eval-sets
 """
@@ -179,6 +182,12 @@ def predict(u8, args):
     elif args.model == "cae":
         dev = device(); m = meta["cae"][str(args.seed)]; s = cae_scores(load_cae(args.seed, dev), u8, mu, sd, m["rows"], m["cols"], dev)
         thr = m["thr"][key]; name = f"(라) CAE 시드 {args.seed}"
+    elif args.model == "ens":
+        from ensemble import combine
+        dev = device(); k = str(args.seed); m = meta["cae"][k]; e = meta["ens"][k]
+        sc = cnn_scores(load_cnn(args.seed, dev), u8, mu, sd, dev)
+        se = cae_scores(load_cae(args.seed, dev), u8, mu, sd, m["rows"], m["cols"], dev)
+        s = combine(sc, se, e); thr = e["thr"][key]; name = f"(마) CNN·CAE 앙상블 시드 {args.seed}"
     else:
         p = meta["pixel"]; s = pixel_scores(u8, mu, sd, p["rows"], p["cols"]); thr = p["thr"][key]; name = "(나) 정상 평균과의 픽셀차"
     flags = s > thr; a = alarms(flags, args.k, args.n)
@@ -221,7 +230,7 @@ def main():
     ap = argparse.ArgumentParser(description="학습된 모델로 이상 탐지 추론")
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--iq"); g.add_argument("--snapshots"); g.add_argument("--eval-sets", action="store_true")
-    ap.add_argument("--noise-ref"); ap.add_argument("--model", choices=["cnn", "cae", "pixel"], default="cnn")
+    ap.add_argument("--noise-ref"); ap.add_argument("--model", choices=["cnn", "cae", "ens", "pixel"], default="cnn")
     ap.add_argument("--seed", type=int, choices=[0, 1, 2], default=0); ap.add_argument("--fpr", type=float, choices=[0.001, 0.01], default=0.001)
     ap.add_argument("--k", type=int, default=2); ap.add_argument("--n", type=int, default=10)
     ap.add_argument("--interval", type=float, default=1.0); ap.add_argument("--out", default=str(C.RUNS / "predict.csv"))
