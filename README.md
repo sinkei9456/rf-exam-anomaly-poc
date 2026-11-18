@@ -9,11 +9,11 @@ Proof-of-concept code that checks, on synthetic data, whether hidden wireless de
 - (C) CNN: a classifier trained to separate normal snapshots from normal snapshots with synthetic rectangular energy blobs
 - (D) CAE (convolutional autoencoder): trained on normal snapshots only; the part it cannot reconstruct is the anomaly
 
-The full write-up (in Korean) is [doc/00_overview.md](doc/00_overview.md), also available as html with a table of contents ([doc/00_overview.html](doc/00_overview.html)).
+The full write-up (in Korean) is [doc/00_overview.md](doc/00_overview.md), also available as a web page with a table of contents ([write-up web page](https://sinkei9456.github.io/rf-exam-anomaly-poc/doc/00_overview.html)).
 
 ## Results
 
-Background noise is 3 s of signal-free IQ data recorded in a park. Weak Wi-Fi and Bluetooth bursts (normal) and two unseen Bluetooth patterns (anomalies) are synthesized on top. Test-set results below use thresholds set on validation normal snapshots for a 0.1 % FPR; CNN and CAE are means over 3 seeds.
+Background noise is 3 s of signal-free IQ data recorded in a park. Weak Wi-Fi and Bluetooth bursts (normal) and two unseen Bluetooth patterns (anomalies) are synthesized on top. Test-set results below use a threshold (the score above which a snapshot is called anomalous) set so that only 0.1 % of the validation normal snapshots (5 of 5,000) exceed it; CNN and CAE are means over 3 seeds.
 
 - FPR: fraction of normal snapshots flagged as anomalous
 - recall: fraction of snapshots with a visible cheating-device signal that are flagged
@@ -110,13 +110,13 @@ python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy 
 |---|---|---|
 | `--model` | cnn | cnn = (C), cae = (D), pixel = (B) |
 | `--seed` | 0 | CNN/CAE seed (0, 1, 2) |
-| `--fpr` | 0.001 | threshold set for this validation FPR (0.001 or 0.01) |
+| `--fpr` | 0.001 | which threshold to use: 0.001 = exceeded by 0.1 % of the validation normal snapshots, 0.01 = exceeded by 1 % |
 | `--noise-ref FILE` | none | normal IQ data used to normalize the noise power (recommended: same site and receiver settings) |
 | `--k`, `--n` | 2, 10 | alarm when k of the last n snapshots are anomalous |
 | `--interval` | 1.0 | seconds between snapshots (time column only) |
 | `--out` | runs/predict.csv | output CSV: index, time_s, score, threshold, anomaly, alarm |
 
-For your own recordings, keep the receiver settings of the training data (HackRF, 2,449.5 MHz, 20 MS/s, fixed gain), give a normal reference with `--noise-ref`, and re-check thresholds on normal data from the new site: the CNN's test FPR moved from the 0.1 % target to 0.01–0.65 % when only the background changed.
+For your own recordings, keep the receiver settings of the training data (HackRF, 2,449.5 MHz, 20 MS/s, fixed gain), give a normal reference with `--noise-ref`, and re-check thresholds on normal data from the new site: the CNN's threshold was set so that 0.1 % of validation normal snapshots exceed it, yet 0.01–0.65 % of test normal snapshots did when only the background changed.
 
 ## Reproducibility
 

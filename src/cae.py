@@ -9,7 +9,7 @@
 이상 점수: 입력 - 복원의 양수 부분(이상 신호는 에너지를 더한다) → r줄 × c칸 상자 평균(상자가 이미지 안에 들어가는 위치만) → 최댓값.
   평활 크기 후보와 선택 규칙은 (가)(나)와 같다. 검증셋 정상 스트림 점수의 상위 1 %를 threshold 로 두었을 때
   검증셋 사각형 덩어리 2,000장의 recall 이 가장 큰 크기. 사각형 덩어리는 이 선택에만 쓴다.
-threshold: 고른 크기에서 검증셋 정상 점수의 FPR 1 %·0.1 %.
+threshold 두 가지: 고른 크기에서 검증셋 정상 스냅샷의 1 %가 넘는 값과 0.1 %가 넘는 값.
 출력: runs/cae_s<시드>.pt, runs/scores_cae.npz(키 "E<시드>/<데이터셋>"), runs/cae_select.json
 사용: python src/cae.py [--seeds 0 1 2] [--epochs 20]
 """
@@ -102,7 +102,7 @@ def main(seeds, epochs):
         sel[str(s)] = dict(history=hist, best_epoch=best_ep, rows=kernels[b][0], cols=kernels[b][1], candidates=cand,
                            thr_fpr1=float(np.quantile(v, 0.99)), thr_fpr01=float(np.quantile(v, 0.999)))
         print(f"시드 {s}: 고른 에포크 {best_ep}, 평활 {kernels[b][0]}줄 × {kernels[b][1]}칸(검증 recall {cand[b]['val_recall_fpr1'] * 100:.1f} %), "
-              f"threshold FPR1% {sel[str(s)]['thr_fpr1']:.4f}, FPR0.1% {sel[str(s)]['thr_fpr01']:.4f}", flush=True)
+              f"threshold(검증셋 정상의 1 %가 넘는 값) {sel[str(s)]['thr_fpr1']:.4f}, threshold(0.1 %가 넘는 값) {sel[str(s)]['thr_fpr01']:.4f}", flush=True)
         np.savez(f, **out); json.dump(sel, open(fj, "w"), ensure_ascii=False, indent=1)
         del net; gc.collect(); torch.cuda.empty_cache()
     print("CAE_DONE", flush=True)

@@ -2,7 +2,7 @@
 
 복사: runs/cnn_s{0,1,2}.pt, runs/cae_s{0,1,2}.pt, runs/pixel_stats.npz → models/
 만듦: models/thresholds.json
-  pixel: (나) 정상 평균과의 픽셀차의 평활 크기(rows 줄 × cols 칸)와 threshold(검증셋 FPR 1 %·0.1 %)
+  pixel: (나) 정상 평균과의 픽셀차의 평활 크기(rows 줄 × cols 칸)와 threshold 두 가지(검증셋 정상의 1 %·0.1 %가 넘는 값)
   cnn:   시드마다 threshold, 고른 에포크, 에포크별 검증 기록
   cae:   시드마다 평활 크기, threshold, 고른 에포크, 에포크별 검증 기록
 저장소의 models/ 는 2026-11-18 학습 결과를 이 스크립트로 내보낸 것이다.

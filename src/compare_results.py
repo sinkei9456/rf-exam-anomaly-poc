@@ -16,11 +16,13 @@ NAME = {"A": "(가) 직전 스냅샷과의 픽셀차", "B": "(나) 정상 평균
 def flat(r):
     """결과 한 방법 → {지표 이름: 값}."""
     out = {}
+    cell = lambda k: "이상 {}, SNR {} dB".format(*k.split("_"))
     for fpr in ("0.01", "0.001"):
-        out[f"FPR, threshold {fpr}"] = r[fpr]["test_fpr"]
+        t = f"threshold: 검증셋 정상의 {float(fpr) * 100:g} %가 넘는 값"
+        out[f"테스트셋 FPR ({t})"] = r[fpr]["test_fpr"]
         for k, c in r[fpr]["cells"].items():
-            out[f"recall {k}, threshold {fpr}"] = c["recall"]; out[f"이벤트 recall {k}, threshold {fpr}"] = c["event_det"]["2"]
-    for k, v in r["auroc"].items(): out[f"AUROC {k}"] = v
+            out[f"{cell(k)} recall ({t})"] = c["recall"]; out[f"{cell(k)} 이벤트 recall ({t})"] = c["event_det"]["2"]
+    for k, v in r["auroc"].items(): out[f"{cell(k)} AUROC"] = v
     return out
 
 
@@ -34,8 +36,8 @@ def main(mine, ref):
         if m not in A: print(f"| {m} | — | 내 결과에 없음 | | |"); continue
         a, b = flat(A[m]), flat(B[m]); d = {k: abs(a[k] - b[k]) for k in b}
         k = max(d, key=d.get); n_diff = sum(v > 1e-6 for v in d.values())
-        scale = 1 if k.startswith("AUROC") else 100
-        unit = "" if k.startswith("AUROC") else " %p"
+        scale = 1 if k.endswith("AUROC") else 100
+        unit = "" if k.endswith("AUROC") else " %p"
         name = NAME.get(m[0], m) + (f" 시드 {m[1:]}" if m[1:].isdigit() else "")
         print(f"| {name} | {len(d)} | {n_diff} | {d[k] * scale:.3f}{unit} | {k} |")
         worst = max(worst, d[k] * scale)

@@ -6,7 +6,7 @@
   증강: 시간축 무작위 순환 이동, 시간축 뒤집기(스냅샷 안에서 신호가 언제 나오는지는 뜻이 없으므로).
 모델: 3×3 합성곱 2개 묶음 4단(채널 16·32·64·64, 사이에 2×2 최대 풀링) → 전체 최대 풀링 → 선형 1개. 출력 = 이상 점수(로짓).
 에포크 선택: 검증셋(정상 5,000장의 상위 1 % 점수를 threshold 로 두고 사각형 덩어리 2,000장의 recall)이 가장 높은 에포크. 테스트셋은 보지 않는다.
-threshold: 고른 에포크의 검증셋 정상 점수에서 FPR 1 %·0.1 % 가 되는 값.
+threshold 두 가지: 고른 에포크에서 검증셋 정상 스냅샷의 1 %가 넘는 값과 0.1 %가 넘는 값.
 출력: runs/cnn_s<시드>.pt, runs/scores_cnn.npz(키 "C<시드>/<데이터셋>"), runs/cnn_select.json(에포크별 검증 기록, threshold)
 사용: python src/cnn.py [--seeds 0 1 2] [--epochs 20]
 """
@@ -70,7 +70,7 @@ def train_one(seed, epochs, prep, Xtr, ytr, Xvn, Xvb, bs=256):
             loss = lossf(net(x).squeeze(1), y); opt.zero_grad(set_to_none=True); loss.backward(); opt.step(); sch.step(); tl += loss.item()
         sn, sb = scores(net, prep, Xvn), scores(net, prep, Xvb); rec, auc = val_metrics(sn, sb)
         hist.append(dict(epoch=ep + 1, train_loss=tl / (len(Xtr) // bs), val_recall_fpr1=rec, val_auroc=auc))
-        print(f"시드 {seed} 에포크 {ep + 1:2d}: 학습 손실 {hist[-1]['train_loss']:.4f}, 검증 recall@FPR1% {rec:.3f}, AUROC {auc:.4f}, {time.time() - t:.0f}초", flush=True)
+        print(f"시드 {seed} 에포크 {ep + 1:2d}: 학습 손실 {hist[-1]['train_loss']:.4f}, 검증 recall(threshold는 검증셋 정상의 1 %가 넘는 값) {rec:.3f}, AUROC {auc:.4f}, {time.time() - t:.0f}초", flush=True)
         if (rec, auc) > best: best = (rec, auc); best_state = {k: v.detach().clone() for k, v in net.state_dict().items()}; best_ep = ep + 1
     net.load_state_dict(best_state)
     return net, hist, best_ep
@@ -89,7 +89,7 @@ def main(seeds, epochs):
         for n in SETS: out[f"C{s}/{n}"] = scores(net, prep, D[n])
         sn = out[f"C{s}/val_normal"]
         sel[str(s)] = dict(history=hist, best_epoch=best_ep, thr_fpr1=float(np.quantile(sn, 0.99)), thr_fpr01=float(np.quantile(sn, 0.999)))
-        print(f"시드 {s}: 고른 에포크 {best_ep}, threshold FPR1% {sel[str(s)]['thr_fpr1']:.3f}, FPR0.1% {sel[str(s)]['thr_fpr01']:.3f}", flush=True)
+        print(f"시드 {s}: 고른 에포크 {best_ep}, threshold(검증셋 정상의 1 %가 넘는 값) {sel[str(s)]['thr_fpr1']:.3f}, threshold(0.1 %가 넘는 값) {sel[str(s)]['thr_fpr01']:.3f}", flush=True)
         np.savez(f, **out); json.dump(sel, open(fj, "w"), ensure_ascii=False, indent=1)
         del net; gc.collect(); torch.cuda.empty_cache()
     print("CNN_DONE", flush=True)

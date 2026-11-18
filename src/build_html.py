@@ -26,7 +26,7 @@ CSS = """
 :root[data-theme="dark"]{--bg:#1a1a19;--ink:#ecebe6;--ink2:#a9a8a2;--line:#555;--head:#2a2a28;--rule:#444}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans CJK KR','Noto Sans KR','NanumGothic','Malgun Gothic',sans-serif;font-size:16px;line-height:1.7}
 :lang(ko){word-break:keep-all}
-html{scroll-behavior:smooth}
+
 .layout{display:grid;grid-template-columns:minmax(0,960px);justify-content:center;gap:40px;padding:0 16px}
 main{min-width:0;padding:32px 0 80px;overflow-wrap:break-word}
 h2,h3{scroll-margin-top:16px}
@@ -82,6 +82,16 @@ SCRIPT = """
   }
   window.addEventListener('scroll',mark,{passive:true}); window.addEventListener('resize',mark);
   window.addEventListener('load',function(){mark(); setTimeout(mark,150);}); window.addEventListener('hashchange',function(){setTimeout(mark,50);});
+  // 목차를 누르면 페이지를 이동하지 않고 그 절로 화면만 내린다. 편집기 미리보기처럼 이동을 막는 창에서 새 탭이 열리지 않게 한다.
+  links.forEach(function(a,i){
+    a.addEventListener('click',function(e){
+      var h=heads[i]; if(!h){return;}
+      e.preventDefault();
+      h.scrollIntoView({behavior:'instant',block:'start'});
+      try{ history.replaceState(null,'','#'+encodeURIComponent(h.id)); }catch(err){}
+      mark();
+    });
+  });
   mark();
 })();
 """

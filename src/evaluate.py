@@ -114,7 +114,7 @@ def write_md(R, ps, sel, ev):
     G = groups(R)
     L = ["# 테스트셋 결과 (src/evaluate.py 가 만든 표)", "",
          "threshold 는 모두 검증셋 정상 스트림에서 정했다. CNN·CAE 는 시드 3개의 평균이고 괄호 안은 최소–최대.", ""]
-    L += ["## 1. 고른 설정 (검증셋으로 고름)", "", "| 방법 | 고른 설정 | threshold (FPR 1 %) | threshold (FPR 0.1 %) |", "|---|---|---:|---:|"]
+    L += ["## 1. 고른 설정 (검증셋으로 고름)", "", "| 방법 | 고른 설정 | threshold, 검증셋 정상의 1 %가 넘는 값 | threshold, 검증셋 정상의 0.1 %가 넘는 값 |", "|---|---|---:|---:|"]
     for m in ("A", "B"):
         L.append(f"| {NAME[m]} | 평활 {ps[m]['rows']}줄 × {ps[m]['cols']}칸 ({ps[m]['rows'] * C.DF_ROW / 1e6:.2f} MHz × {ps[m]['cols'] * C.DT_COL * 1e3:.1f} ms) | {ps[m]['thr_fpr1']:.2f} | {ps[m]['thr_fpr01']:.2f} |")
     for g in G:
@@ -130,7 +130,7 @@ def write_md(R, ps, sel, ev):
         return out
     hdr = ["| 방법 | " + " | ".join(f"SNR {s} dB" for s in SNRS) + " |", "|---|" + "---:|" * len(SNRS)]
     for fpr in (0.01, 0.001):
-        L += ["", f"## {2 if fpr == 0.01 else 3}. 검증셋 FPR {fpr * 100:g} % threshold", "",
+        L += ["", f"## {2 if fpr == 0.01 else 3}. threshold를 검증셋 정상의 {fpr * 100:g} %가 넘게 정했을 때", "",
               "**테스트셋 정상 스트림 20,000장에서 잰 FPR (%)와 시간당 경보 수 (회)**", "",
               "| 방법 | FPR (%) | 시간당 경보 수, 최근 10장 중 1장 이상 | 시간당 경보 수, 최근 10장 중 2장 이상 |", "|---|---:|---:|---:|"]
         for m in ("A", "B"):
@@ -219,20 +219,24 @@ COL = {"A": "#1f77b4", "B": "#ff7f0e", "CNN": "#2ca02c", "CAE": "#9467bd"}
 
 
 def fig3(R):
-    """SNR 별 스냅샷 recall, 검증셋 FPR 1 %·0.1 % threshold."""
+    """SNR 별 스냅샷 recall. 실선 = threshold 를 검증셋 정상의 1 %가 넘게 정했을 때, 점선 = 0.1 %."""
     fig, axs = plt.subplots(1, 2, figsize=(12, 5.8), constrained_layout=True)
     for ax, kind in zip(axs, (1, 2)):
         ax.axvspan(2, 10, color="0.9", zorder=0); ax.text(6, 1.02, "정상 와이파이·블루투스의 SNR 범위 (2–10 dB)", ha="center", fontsize=8, color="0.35")
         for fpr, ls in ((0.01, "-"), (0.001, "--")):
             for m in ("A", "B"):
-                ax.plot(SNRS, [R[m][fpr]["cells"][f"{kind}_{s}"]["recall"] for s in SNRS], ls, marker="o", color=COL[m], label=f"{NAME[m]}, FPR {fpr * 100:g} %")
+                ax.plot(SNRS, [R[m][fpr]["cells"][f"{kind}_{s}"]["recall"] for s in SNRS], ls, marker="o", color=COL[m], label=NAME[m] if fpr == 0.01 else None)
             for g in groups(R):
                 pre = LEARNED[g][0]
                 v = np.array([[R[m][fpr]["cells"][f"{kind}_{s}"]["recall"] for s in SNRS] for m in R if m[0] == pre and m[1:].isdigit()])
-                ax.plot(SNRS, v.mean(0), ls, marker="s" if g == "CNN" else "^", color=COL[g], label=f"{NAME[g]} (시드 3개 평균), FPR {fpr * 100:g} %")
+                ax.plot(SNRS, v.mean(0), ls, marker="s" if g == "CNN" else "^", color=COL[g], label=f"{NAME[g]} (시드 3개 평균)" if fpr == 0.01 else None)
                 ax.fill_between(SNRS, v.min(0), v.max(0), color=COL[g], alpha=0.15)
         ax.set_title(f"테스트 이상 {kind}: {C.ANOM[kind]['name']}", fontsize=10); ax.set_xlabel("이상 신호 SNR (dB)"); ax.set_ylabel("스냅샷 recall"); ax.set_ylim(-0.02, 1.08); ax.set_xticks(SNRS); ax.grid(alpha=0.3)
-    fig.legend(*axs[0].get_legend_handles_labels(), loc="outside lower center", ncol=4, fontsize=8)
+    from matplotlib.lines import Line2D
+    h, l = axs[0].get_legend_handles_labels()
+    h += [Line2D([], [], color="0.3", ls="-"), Line2D([], [], color="0.3", ls="--")]
+    l += ["실선: threshold를 검증셋 정상의 1 %가 넘게 정했을 때", "점선: threshold를 검증셋 정상의 0.1 %가 넘게 정했을 때"]
+    fig.legend(h, l, loc="outside lower center", ncol=3, fontsize=8)
     fig.savefig(C.FIG / "fig3_recall_vs_snr.png", dpi=130); plt.close(fig)
 
 
@@ -248,7 +252,7 @@ def fig4(M):
         for k, (t0, a, snr) in enumerate(DEMO_EVENTS):
             ax.axvspan(t0 - 0.5, t0 + 9.5, color="red", alpha=0.25)
             ax.text(t0 + 25, 0.97, f"이상 {a}, SNR {snr:g} dB", transform=ax.get_xaxis_transform(), ha="left", va="top", fontsize=8, color="red")
-        ax.axhline(M[m]["thr"][0.01], color="#ff7f0e", lw=1, label="threshold, 검증셋 FPR 1 %"); ax.axhline(M[m]["thr"][0.001], color="#d62728", lw=1, ls="--", label="threshold, 검증셋 FPR 0.1 %")
+        ax.axhline(M[m]["thr"][0.01], color="#ff7f0e", lw=1, label="threshold: 검증셋 정상의 1 %가 넘는 값"); ax.axhline(M[m]["thr"][0.001], color="#d62728", lw=1, ls="--", label="threshold: 검증셋 정상의 0.1 %가 넘는 값")
         ax.set_title(f"{NAME[nm]}{' 시드 0' if m[1:].isdigit() else ''}: 1시간 시연 스트림 (1초에 한 장, 3,600장)", fontsize=10); ax.set_xlabel("시간 (초)"); ax.set_ylabel("이상 점수"); ax.legend(fontsize=8, loc="upper left"); ax.set_xlim(0, len(t))
         for k, (t0, a, snr) in enumerate(DEMO_EVENTS):
             az = fig.add_subplot(gs[len(rows) + ri, k]); sl = slice(t0 - 20, t0 + 30)
@@ -270,7 +274,7 @@ def fig5(M):
     for ri, (m, nm) in enumerate(rows):
         s = M[m]["s"]["test_normal"]; top = np.argsort(-np.nan_to_num(s, nan=-1e9))[:3]
         for ax, i in zip(axs[ri], top):
-            im = show(ax, C.to_db(X[i]), f"{NAME[nm][:3]} 오경보: 점수 {s[i]:.2f} (threshold FPR 1 % {M[m]['thr'][0.01]:.2f})")
+            im = show(ax, C.to_db(X[i]), f"{NAME[nm][:3]} 오경보: 점수 {s[i]:.2f}\nthreshold {M[m]['thr'][0.01]:.2f}(검증셋 정상의 1 %가 넘는 값)")
             boxes(ax, Bx[i], ("wifi",), "cyan", ":", 1.0); boxes(ax, Bx[i], ("bt",), "white", ":", 1.0)
             if m == "B":
                 r, c = map(int, P["B/test_normal/loc"][i]); ax.plot((c * C.HOP + C.NFFT / 2) / C.FS * 1e3, (C.FC - C.FS / 2 + (r + 0.5) * C.DF_ROW) / 1e6, "g+", ms=14, mew=2)

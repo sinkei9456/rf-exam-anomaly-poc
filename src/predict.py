@@ -4,7 +4,7 @@
   cnn_s0.pt, cnn_s1.pt, cnn_s2.pt   (다) CNN 가중치(시드 0·1·2)
   cae_s0.pt, cae_s1.pt, cae_s2.pt   (라) CAE(합성곱 오토인코더) 가중치(시드 0·1·2)
   pixel_stats.npz                   학습셋 정상 스냅샷 10,000장의 픽셀별 평균·표준편차(dB). CNN·CAE 입력과 (나) 픽셀차에 씀
-  thresholds.json                   검증셋 정상 스냅샷으로 정한 threshold(FPR 1 %·0.1 %), 평활 크기, 학습 기록
+  thresholds.json                   threshold 두 가지(검증셋 정상 스냅샷의 1 %·0.1 %가 넘는 값), 평활 크기, 학습 기록
 
 입력(셋 중 하나):
   --iq FILE         IQ 데이터. 20 MS/s 로 1초에 한 번 받은 20 ms 조각(400,000 표본)을 시간 순서대로 이어 붙인 파일.
@@ -20,7 +20,7 @@
 판정:
   --model cnn|cae|pixel  cnn = (다) CNN(기본), cae = (라) CAE, pixel = (나) 정상 평균과의 픽셀차
   --seed 0|1|2       CNN·CAE 시드(기본 0)
-  --fpr 0.001|0.01   검증셋 정상 스냅샷에서 이 FPR 이 되게 정한 threshold 를 쓴다(기본 0.001)
+  --fpr 0.001|0.01   0.001 = 검증셋 정상 스냅샷의 0.1 %가 넘게 정한 threshold(기본), 0.01 = 1 %가 넘게 정한 threshold
   --k 2 --n 10       최근 n 장 중 k 장 이상이 이상이면 경보(기본 10장 중 2장)
   --interval 1.0     스냅샷 사이 간격(초). 출력의 시각 칸에만 쓴다.
 출력: --out CSV(기본 runs/predict.csv). 칸: 번호, 시각(초), 이상 점수, threshold, 이상 판정(0/1), 경보(0/1).
@@ -187,7 +187,7 @@ def predict(u8, args):
         f.write("index,time_s,score,threshold,anomaly,alarm\n")
         for i in range(len(s)): f.write(f"{i},{i * args.interval:.3f},{s[i]:.5f},{thr:.5f},{int(flags[i])},{int(a[i])}\n")
     ep = episodes(a)
-    print(f"{name}, threshold {thr:.4f}(검증셋 FPR {args.fpr * 100:g} %), 스냅샷 {len(s)}장 중 이상 판정 {int(flags.sum())}장")
+    print(f"{name}, threshold {thr:.4f}(검증셋 정상의 {args.fpr * 100:g} %가 넘게 정한 값), 스냅샷 {len(s)}장 중 이상 판정 {int(flags.sum())}장")
     print(f"경보(최근 {args.n}장 중 {args.k}장 이상): {len(ep)}번" + "".join(f"\n  {a0 * args.interval:.0f}–{a1 * args.interval:.0f}초(스냅샷 {a0}–{a1})" for a0, a1 in ep))
     print(f"결과 파일: {out}")
     return s, flags, a
@@ -211,7 +211,7 @@ def eval_sets():
             v = out[f"{pre}{s}/val_normal"]; t1, t01 = float(np.quantile(v, 0.99)), float(np.quantile(v, 0.999))
             sel[s] = dict(history=m["history"], best_epoch=m["best_epoch"], thr_fpr1=t1, thr_fpr01=t01)
             if g == "cae": sel[s].update(rows=m["rows"], cols=m["cols"])
-            print(f"{g.upper()} 시드 {s}: threshold FPR 1 % {t1:.4f}(models/ 값 {m['thr']['0.01']:.4f}), FPR 0.1 % {t01:.4f}(models/ 값 {m['thr']['0.001']:.4f})", flush=True)
+            print(f"{g.upper()} 시드 {s}: 검증셋 정상의 1 %가 넘는 threshold {t1:.4f}(models/ 값 {m['thr']['0.01']:.4f}), 0.1 %가 넘는 threshold {t01:.4f}(models/ 값 {m['thr']['0.001']:.4f})", flush=True)
         np.savez(C.RUNS / f"scores_{g}.npz", **out)
         json.dump(sel, open(C.RUNS / f"{g}_select.json", "w"), ensure_ascii=False, indent=1)
     print("PREDICT_EVAL_SETS_DONE", flush=True)
