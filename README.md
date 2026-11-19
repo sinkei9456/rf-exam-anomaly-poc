@@ -19,14 +19,16 @@ There are two experiments.
 
 ## Experiment 2 results: per-site training
 
+**The anomaly signals in these experiments were not recorded from real cheating devices (AI glasses, Bluetooth earphones).** They are synthetic signals imitating the Bluetooth specification, added to real background IQ recordings. Nothing has been checked with real device signals yet.
+
 The 1 s IQ files of each site are split in time order: earlier files for training, later files for testing. Weak Wi-Fi and Bluetooth bursts (normal) and two unseen Bluetooth patterns (anomalies) are synthesized on top. Test-set results are shown below. The threshold (the score above which a snapshot is called anomalous) is the top 0.1 % of the validation normal scores of each site. CAE values are means over 3 seeds.
 
-- FPR: fraction of device-free normal snapshots flagged as anomalous
-- recall: fraction of snapshots with a visible device signal that are flagged
+- FPR: fraction of normal snapshots (no cheating-device signal) flagged as anomalous
+- recall: fraction of snapshots with a visible cheating-device signal (synthetic) that are flagged
 - SNR: how many dB the signal is above the background noise level within the same pixel. A pixel containing the signal is 3.0 dB brighter than the background at SNR 0 dB and 12.3 dB brighter at 12 dB. Normal Wi-Fi and Bluetooth were synthesized at 2–10 dB.
 - Alarm rule: one snapshot per second; alarm when at least 2 of the last 10 snapshots (10 s) are anomalous.
-- False alarms per hour: how often the alarm goes off per hour with no device present
-- Event recall: fraction of 40 cases with a device switched on for 10 s in which the alarm went off
+- False alarms per hour: how often the alarm goes off per hour with no cheating-device signal present
+- Event recall: fraction of 40 cases with a synthetic cheating-device signal added for 10 s in which the alarm went off
 
 **Test FPR and false alarms per hour by site**
 
@@ -145,7 +147,7 @@ python src/site_setup.py            # data/background/indoor/01–05.npy, data/b
 
 ## Usage 1: a new site (train, set thresholds, infer)
 
-Record IQ data at the site in the normal state (no device), train the site's model on it, then score data recorded during the exam with that model. Two commands:
+Record IQ data at the site in the normal state (no cheating device), train the site's model on it, then score data recorded during the exam with that model. Two commands:
 
 ```
 python src/site_train.py --out sites/study_cafe --normal normal_capture.cs8     # train, pick kernels and thresholds, save the site folder
