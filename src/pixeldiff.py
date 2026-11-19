@@ -16,7 +16,7 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
 import common as C
 
 ROWS, COLS = [1, 6, 13, 26], [1, 2, 5, 10, 15]
-SETS = ["val_normal", "val_blob", "test_normal", "test_event", "test_demo"]
+SETS = ["val_normal", "val_blob", "test_normal", "test_event"] + ([] if C.SITE else ["test_demo"])   # 장소별 실험에는 1시간 시연 스트림이 없다
 
 
 def load(name):
@@ -57,7 +57,7 @@ def thr(scores, fpr):
 
 
 def main():
-    C.RUNS.mkdir(exist_ok=True)
+    C.RUNS.mkdir(parents=True, exist_ok=True)
     Xn = load("train_normal"); mu = Xn.mean(0); sd = np.maximum(Xn.std(0), 0.3); del Xn
     np.savez(C.RUNS / "pixel_stats.npz", mu=mu, sd=sd)
     D = {n: load(n) for n in SETS}

@@ -188,7 +188,7 @@ def fig1(ev):
     for ax, (n, i, t) in zip(axs.ravel(), P):
         im = show(ax, C.to_db(X[n][i]), t)
         boxes(ax, B[n][i], ("wifi", "bt"), "cyan", ":", 0.8); boxes(ax, B[n][i], ("blob", "anom1", "anom2"), "lime", "--", 1.2)
-    fig.colorbar(im, ax=axs, shrink=0.6, label="잡음 바닥 대비 세기 (dB)")
+    fig.colorbar(im, ax=axs, shrink=0.6, label="배경 잡음 세기 대비 밝기 (dB)")
     fig.savefig(C.FIG / "fig1_examples.png", dpi=130); plt.close(fig)
 
 
@@ -216,7 +216,7 @@ def fig2(ev, ps):
     r, c = np.unravel_index(np.nanargmax(ds), ds.shape); tt = (c * C.HOP + C.NFFT / 2) / C.FS * 1e3; ff = (C.FC - C.FS / 2 + (r + 0.5) * C.DF_ROW) / 1e6
     axs[1, 3].plot(tt, ff, "k+", ms=14, mew=2); axs[1, 3].set_title(f"8. (가) 평활 {ps['A']['rows']}줄 × {ps['A']['cols']}칸, + = 최댓값 {np.nanmax(ds):.1f}", fontsize=9); fig.colorbar(im7, ax=axs[1, 3])
     for ax in axs.ravel(): ax.set_xlabel("시간 (ms)", fontsize=8); ax.set_ylabel("주파수 (MHz)", fontsize=8); ax.tick_params(labelsize=7)
-    fig.colorbar(im0, ax=axs[0, :2], shrink=0.8, label="잡음 바닥 대비 세기 (dB)")
+    fig.colorbar(im0, ax=axs[0, :2], shrink=0.8, label="배경 잡음 세기 대비 밝기 (dB)")
     fig.savefig(C.FIG / "fig2_pixeldiff_steps.png", dpi=130); plt.close(fig)
 
 
@@ -283,7 +283,7 @@ def fig5(M):
             boxes(ax, Bx[i], ("wifi",), "cyan", ":", 1.0); boxes(ax, Bx[i], ("bt",), "white", ":", 1.0)
             if m == "B":
                 r, c = map(int, P["B/test_normal/loc"][i]); ax.plot((c * C.HOP + C.NFFT / 2) / C.FS * 1e3, (C.FC - C.FS / 2 + (r + 0.5) * C.DF_ROW) / 1e6, "g+", ms=14, mew=2)
-    fig.colorbar(im, ax=axs, shrink=0.6, label="잡음 바닥 대비 세기 (dB)")
+    fig.colorbar(im, ax=axs, shrink=0.6, label="배경 잡음 세기 대비 밝기 (dB)")
     fig.savefig(C.FIG / "fig5_false_alarms.png", dpi=130); plt.close(fig)
 
 

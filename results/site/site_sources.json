@@ -1,0 +1,25 @@
+{
+ "indoor/01.npy": "1_nodrone_indoor/20261007_antenna_on/recordings/01/antenna_connected_no_drone_01_2450000000Hz_20000000sps_1s.cs8",
+ "indoor/02.npy": "1_nodrone_indoor/20261007_antenna_on/recordings/02/antenna_connected_no_drone_02_2450000000Hz_20000000sps_1s.cs8",
+ "indoor/03.npy": "1_nodrone_indoor/20261007_antenna_on/recordings/03/antenna_connected_no_drone_03_2450000000Hz_20000000sps_1s.cs8",
+ "indoor/04.npy": "1_nodrone_indoor/20261007_antenna_on/recordings/04/antenna_connected_no_drone_04_2450000000Hz_20000000sps_1s.cs8",
+ "indoor/05.npy": "1_nodrone_indoor/20261007_antenna_on/recordings/05/antenna_connected_no_drone_05_2450000000Hz_20000000sps_1s.cs8",
+ "indoor_droneoff/01.npy": "2_neo2_indoor/20261008_drone_off/recordings/01/neo2_o4_off_01_2450500000Hz_20000000sps_1s.cs8",
+ "indoor_droneoff/02.npy": "2_neo2_indoor/20261008_drone_off/recordings/02/neo2_o4_off_02_2450500000Hz_20000000sps_1s.cs8",
+ "indoor_droneoff/03.npy": "2_neo2_indoor/20261008_drone_off/recordings/03/neo2_o4_off_03_2450500000Hz_20000000sps_1s.cs8",
+ "indoor_droneoff/04.npy": "2_neo2_indoor/20261008_drone_off/recordings/04/neo2_o4_off_04_2450500000Hz_20000000sps_1s.cs8",
+ "indoor_droneoff/05.npy": "2_neo2_indoor/20261008_drone_off/recordings/05/neo2_o4_off_05_2450500000Hz_20000000sps_1s.cs8",
+ "indoor 잡음 전력(학습셋 파일별)": [
+  5.0923938006320824e-05,
+  5.358613160974924e-05,
+  5.362079791251257e-05
+ ],
+ "indoor_droneoff 잡음 전력(학습셋 파일별)": [
+  5.287345960565814e-05,
+  5.4337584735887014e-05,
+  5.450874337319436e-05
+ ],
+ "park 잡음 전력(학습셋 파일별)": [
+  0.75234180382635
+ ]
+}

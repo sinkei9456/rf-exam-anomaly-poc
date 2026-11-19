@@ -1,4 +1,4 @@
-"""doc/00_overview.md 를 읽기용 html(doc/00_overview.html)로 바꾼다. md 는 건드리지 않는다. (2026-11-18, research/shoes/src/build_html.py 와 같은 방식)
+"""doc/ 의 개요 md 를 읽기용 html(같은 이름의 .html)로 바꾼다. md 는 건드리지 않는다. (2026-11-18, research/shoes/src/build_html.py 와 같은 방식)
 
 * 그림은 html 안에 넣는다(base64). 그래서 html 파일 하나만 옮겨도 그림이 보인다.
 * 그림 바로 뒤의 "그림 ..." 또는 "**그림 ...**" 문단은 그림 설명으로 묶는다.
@@ -10,17 +10,19 @@
   브라우저가 계산한 # 뒷부분과 똑같을 때만 문서 안에서 이동하고, 다르면 바깥 새 탭으로 연다. 한글 주소는 %EB%A7%88 처럼 바뀌어
   달라지므로 쓰면 안 된다(2026-11-18 고침). 클릭 처리 JS 도 코드 서버 처리기까지 클릭이 가지 않게 막는다(stopPropagation).
 
-실행: python src/build_html.py   (requirements.txt 의 markdown 모듈이 필요)
-00_overview.md 를 고친 뒤에는 다시 돌린다.
+실행: python src/build_html.py [doc/00_overview_rev2.md]   (requirements.txt 의 markdown 모듈이 필요, 기본값은 doc/00_overview_rev2.md)
+문서 이름(2026-11-19 정리): ver1·ver2 = 원문(첫 번째·두 번째 실험), rev1·rev2 = 각 원문의 표현·용어 교정본.
+md 를 고친 뒤에는 다시 돌린다.
 """
 import base64
 import re
+import sys
 from pathlib import Path
 
 import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "doc" / "00_overview.md"
+SOURCE = ROOT / "doc" / "00_overview_rev2.md"
 MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 CSS = """
 :root{--bg:#fcfcfb;--ink:#1b1b1a;--ink2:#5c5b57;--line:#c9c8c2;--head:#f1f0ec;--rule:#ddd}
@@ -151,5 +153,5 @@ def build(md_path):
 
 
 if __name__ == "__main__":
-    t = build(SOURCE)
+    t = build((ROOT / sys.argv[1]).resolve() if len(sys.argv) > 1 else SOURCE)
     print(f"{t.relative_to(ROOT)}  {t.stat().st_size / 1e6:.1f} MB")

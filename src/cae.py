@@ -12,6 +12,14 @@
 threshold 두 가지: 고른 크기에서 검증셋 정상 스냅샷의 1 %가 넘는 값과 0.1 %가 넘는 값.
 출력: runs/cae_s<시드>.pt, runs/scores_cae.npz(키 "E<시드>/<데이터셋>"), runs/cae_select.json
 사용: python src/cae.py [--seeds 0 1 2] [--epochs 20]
+
+크기 세 가지(2026-11-19 장소별 실험, --size). 세 모델 모두 가운데 압축 표현은 16채널 × 16 × 7 = 1,792개로 같고 인코더·디코더 채널 수만 다르다.
+| --size | 인코더 채널 | 학습 파라미터 | 11-18 모델 대비 |
+| 65k    | 16·32·64    | 65,265개      | 같음(11-18 모델)  |
+| 21k    | 8·16·32     | 21,121개      | 1/3.09          |
+| 6k     | 4·7·14      | 6,489개       | 1/10.06         |
+--size 를 주면 출력 이름이 cae<크기>_s<시드>.pt, scores_cae<크기>.npz, cae<크기>_select.json 이 된다. 주지 않으면 11-18 이름 그대로(65k 구조).
+장소별 실험: EXAM_SITE=<장소> python src/cae.py --size 21k → runs/site/<장소>/
 """
 import sys, json, time, argparse, gc
 import numpy as np
@@ -21,7 +29,8 @@ import common as C
 from cnn import Prep, gpu_u8, dev
 from pixeldiff import ROWS, COLS
 
-SETS = ["val_normal", "val_blob", "test_normal", "test_event", "test_demo"]
+SETS = ["val_normal", "val_blob", "test_normal", "test_event"] + ([] if C.SITE else ["test_demo"])   # 장소별 실험에는 1시간 시연 스트림이 없다
+SIZES = {"65k": (16, 32, 64), "21k": (8, 16, 32), "6k": (4, 7, 14)}   # 인코더 채널 수
 
 
 def down(i, o):
@@ -33,10 +42,11 @@ def up(i, o):
 
 
 class CAE(nn.Module):
-    def __init__(self):
+    def __init__(self, ch=(16, 32, 64), z=16):
         super().__init__()
-        self.enc = nn.Sequential(down(1, 16), down(16, 32), down(32, 64), nn.Conv2d(64, 16, 3, stride=2, padding=1))
-        self.dec = nn.Sequential(up(16, 64), up(64, 32), up(32, 16), nn.Upsample(scale_factor=2, mode="nearest"), nn.Conv2d(16, 1, 3, padding=1))
+        a, b, c = ch
+        self.enc = nn.Sequential(down(1, a), down(a, b), down(b, c), nn.Conv2d(c, z, 3, stride=2, padding=1))
+        self.dec = nn.Sequential(up(z, c), up(c, b), up(b, a), nn.Upsample(scale_factor=2, mode="nearest"), nn.Conv2d(a, 1, 3, padding=1))
 
     def forward(self, x):
         return F.interpolate(self.dec(self.enc(x)), size=x.shape[-2:], mode="bilinear", align_corners=False)
@@ -61,9 +71,9 @@ def scores_all(net, prep, X, kernels, bs=256):
     return out.numpy()
 
 
-def train_one(seed, epochs, prep, Xtr, Xvn, bs=128):
+def train_one(seed, epochs, prep, Xtr, Xvn, bs=128, ch=(16, 32, 64)):
     torch.manual_seed(seed); np.random.seed(seed)
-    net = CAE().to(dev); opt = torch.optim.AdamW(net.parameters(), lr=1e-3, weight_decay=1e-4)
+    net = CAE(ch).to(dev); opt = torch.optim.AdamW(net.parameters(), lr=1e-3, weight_decay=1e-4)
     steps = epochs * (len(Xtr) // bs); sch = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=1e-3, total_steps=steps)
     g = torch.Generator(device=dev); g.manual_seed(seed); ar = torch.arange(C.NT, device=dev)
     hist, best, best_state, best_ep = [], 1e9, None, 0
@@ -76,21 +86,24 @@ def train_one(seed, epochs, prep, Xtr, Xvn, bs=128):
             fl = torch.rand(len(idx), device=dev, generator=g) < 0.5; x[fl] = x[fl].flip(3)
             loss = F.mse_loss(net(x), x); opt.zero_grad(set_to_none=True); loss.backward(); opt.step(); sch.step(); tl += loss.item()
         vl = recon_loss(net, prep, Xvn)
-        hist.append(dict(epoch=ep + 1, train_loss=tl / (len(Xtr) // bs), val_loss=vl))
+        hist.append(dict(epoch=ep + 1, train_loss=tl / (len(Xtr) // bs), val_loss=vl, seconds=time.time() - t))
         print(f"시드 {seed} 에포크 {ep + 1:2d}: 학습 복원 오차 {hist[-1]['train_loss']:.5f}, 검증 정상 복원 오차 {vl:.5f}, {time.time() - t:.0f}초", flush=True)
         if vl < best: best, best_ep, best_state = vl, ep + 1, {k: v.detach().clone() for k, v in net.state_dict().items()}
     net.load_state_dict(best_state)
     return net, hist, best_ep
 
 
-def main(seeds, epochs):
+def main(seeds, epochs, size=None):
+    name = f"cae{size}" if size else "cae"; ch = SIZES[size] if size else (16, 32, 64)
     prep = Prep(); Xtr = gpu_u8("train_normal"); D = {n: gpu_u8(n) for n in SETS}
     kernels = [(r, c) for r in ROWS for c in COLS]
-    f = C.RUNS / "scores_cae.npz"; out = dict(np.load(f)) if f.exists() else {}
-    fj = C.RUNS / "cae_select.json"; sel = json.load(open(fj)) if fj.exists() else {}
+    f = C.RUNS / f"scores_{name}.npz"; out = dict(np.load(f)) if f.exists() else {}
+    fj = C.RUNS / f"{name}_select.json"; sel = json.load(open(fj)) if fj.exists() else {}
     for s in seeds:
-        net, hist, best_ep = train_one(s, epochs, prep, Xtr, D["val_normal"])
-        torch.save(net.state_dict(), C.RUNS / f"cae_s{s}.pt")
+        t0 = time.time()
+        net, hist, best_ep = train_one(s, epochs, prep, Xtr, D["val_normal"], ch=ch)
+        train_sec = time.time() - t0
+        torch.save(net.state_dict(), C.RUNS / f"{name}_s{s}.pt")
         sn, sb = scores_all(net, prep, D["val_normal"], kernels), scores_all(net, prep, D["val_blob"], kernels)
         cand = []
         for j, (r, c) in enumerate(kernels):
@@ -99,7 +112,8 @@ def main(seeds, epochs):
         b = max(range(len(kernels)), key=lambda j: (cand[j]["val_recall_fpr1"], cand[j]["val_auroc"])); kr = [kernels[b]]
         for n in SETS: out[f"E{s}/{n}"] = scores_all(net, prep, D[n], kr)[0]
         v = out[f"E{s}/val_normal"]
-        sel[str(s)] = dict(history=hist, best_epoch=best_ep, rows=kernels[b][0], cols=kernels[b][1], candidates=cand,
+        sel[str(s)] = dict(history=hist, best_epoch=best_ep, rows=kernels[b][0], cols=kernels[b][1], candidates=cand, channels=list(ch),
+                           n_params=int(sum(p.numel() for p in net.parameters())), train_seconds=train_sec,
                            thr_fpr1=float(np.quantile(v, 0.99)), thr_fpr01=float(np.quantile(v, 0.999)))
         print(f"시드 {s}: 고른 에포크 {best_ep}, 평활 {kernels[b][0]}줄 × {kernels[b][1]}칸(검증 recall {cand[b]['val_recall_fpr1'] * 100:.1f} %), "
               f"threshold(검증셋 정상의 1 %가 넘는 값) {sel[str(s)]['thr_fpr1']:.4f}, threshold(0.1 %가 넘는 값) {sel[str(s)]['thr_fpr01']:.4f}", flush=True)
@@ -110,4 +124,5 @@ def main(seeds, epochs):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2]); ap.add_argument("--epochs", type=int, default=20)
-    A = ap.parse_args(); main(A.seeds, A.epochs)
+    ap.add_argument("--size", choices=list(SIZES), default=None)
+    A = ap.parse_args(); main(A.seeds, A.epochs, A.size)

@@ -11,6 +11,7 @@
 | test_demo      3,600 | 2–3초             | 1시간 시연 스트림, 이상 이벤트 3번(각 10초)만 들어감 |
 테스트용 이상(블루투스 2종)은 학습셋·검증셋 어디에도 없다.
 출력: data/<이름>.npy (uint8, 장수 × 256 × 97), data/<이름>.csv (스냅샷마다 정보), data/<이름>_boxes.json (넣은 신호 박스)
+장소별 실험: EXAM_SITE=<장소> python src/make_data.py → data/site/<장소>/ (train_blob·test_demo 는 만들지 않음, site_setup.py 참고)
 사용: python src/make_data.py [--workers 16]
 """
 import sys, json, time, argparse
@@ -73,6 +74,7 @@ def main(workers):
     for r in ("train", "val", "test"): C.background(r)                    # 부모에서 rms 를 미리 계산(자식이 물려받음)
     with Pool(workers) as P:
         for name, sp in specs().items():
+            if C.SITE and name in ("train_blob", "test_demo"): continue      # 장소별 실험(EXAM_SITE)에는 CNN 학습용 사각형·1시간 시연 스트림을 만들지 않는다
             if (C.DATA / f"{name}.npy").exists(): print("있음, 건너뜀:", name, flush=True); continue
             t = time.time(); out = P.map(snapshot, sp, chunksize=32)
             imgs = np.stack([o[0] for o in out]); info = [o[1] for o in out]; boxes = [o[2] for o in out]

@@ -7,3 +7,6 @@ data/background/
 runs/
 __pycache__/
 *.pyc
+# Second experiment: per-site snapshots and the raw indoor IQ archive (see README "Get the data")
+data/site/
+data/raw/

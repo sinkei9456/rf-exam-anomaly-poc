@@ -1,0 +1,46 @@
+{
+ "A": {
+  "n_params": 0,
+  "cpu_ms": 0.07657613605260849
+ },
+ "B": {
+  "n_params": 0,
+  "cpu_ms": 0.04715193063020706
+ },
+ "cae65k": {
+  "n_params": 65265,
+  "channels": [
+   16,
+   32,
+   64
+  ],
+  "file_bytes": 276679,
+  "train_seconds": 86.79802918434143,
+  "epochs": 20,
+  "cpu_ms": 9.004633175209165
+ },
+ "cae21k": {
+  "n_params": 21121,
+  "channels": [
+   8,
+   16,
+   32
+  ],
+  "file_bytes": 98823,
+  "train_seconds": 47.09677847226461,
+  "epochs": 20,
+  "cpu_ms": 6.2794312834739685
+ },
+ "cae6k": {
+  "n_params": 6489,
+  "channels": [
+   4,
+   7,
+   14
+  ],
+  "file_bytes": 39129,
+  "train_seconds": 27.442665417989094,
+  "epochs": 20,
+  "cpu_ms": 4.547692136839032
+ }
+}

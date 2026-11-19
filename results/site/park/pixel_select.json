@@ -1,0 +1,298 @@
+{
+ "A": {
+  "candidates": [
+   {
+    "rows": 1,
+    "cols": 1,
+    "thr_fpr1": 21.176471710205078,
+    "val_recall_fpr1": 0.0095,
+    "val_auroc": 0.7776745349069814
+   },
+   {
+    "rows": 1,
+    "cols": 2,
+    "thr_fpr1": 18.901962280273438,
+    "val_recall_fpr1": 0.009,
+    "val_auroc": 0.810636227245449
+   },
+   {
+    "rows": 1,
+    "cols": 5,
+    "thr_fpr1": 12.01568603515625,
+    "val_recall_fpr1": 0.412,
+    "val_auroc": 0.8683041608321664
+   },
+   {
+    "rows": 1,
+    "cols": 10,
+    "thr_fpr1": 10.713726043701172,
+    "val_recall_fpr1": 0.428,
+    "val_auroc": 0.8901773354670934
+   },
+   {
+    "rows": 1,
+    "cols": 15,
+    "thr_fpr1": 9.506091117858887,
+    "val_recall_fpr1": 0.4615,
+    "val_auroc": 0.9108254650930186
+   },
+   {
+    "rows": 6,
+    "cols": 1,
+    "thr_fpr1": 18.745098114013672,
+    "val_recall_fpr1": 0.01,
+    "val_auroc": 0.7750612122424485
+   },
+   {
+    "rows": 6,
+    "cols": 2,
+    "thr_fpr1": 17.568889617919922,
+    "val_recall_fpr1": 0.008,
+    "val_auroc": 0.8056913382676535
+   },
+   {
+    "rows": 6,
+    "cols": 5,
+    "thr_fpr1": 10.787346839904785,
+    "val_recall_fpr1": 0.4225,
+    "val_auroc": 0.8685767153430686
+   },
+   {
+    "rows": 6,
+    "cols": 10,
+    "thr_fpr1": 9.88266658782959,
+    "val_recall_fpr1": 0.434,
+    "val_auroc": 0.8893089617923585
+   },
+   {
+    "rows": 6,
+    "cols": 15,
+    "thr_fpr1": 8.930893898010254,
+    "val_recall_fpr1": 0.4575,
+    "val_auroc": 0.9109404880976195
+   },
+   {
+    "rows": 13,
+    "cols": 1,
+    "thr_fpr1": 18.220211029052734,
+    "val_recall_fpr1": 0.01,
+    "val_auroc": 0.7622707541508301
+   },
+   {
+    "rows": 13,
+    "cols": 2,
+    "thr_fpr1": 17.206880569458008,
+    "val_recall_fpr1": 0.007,
+    "val_auroc": 0.7912247449489898
+   },
+   {
+    "rows": 13,
+    "cols": 5,
+    "thr_fpr1": 10.432820320129395,
+    "val_recall_fpr1": 0.396,
+    "val_auroc": 0.853009301860372
+   },
+   {
+    "rows": 13,
+    "cols": 10,
+    "thr_fpr1": 9.696821212768555,
+    "val_recall_fpr1": 0.395,
+    "val_auroc": 0.8745974194838968
+   },
+   {
+    "rows": 13,
+    "cols": 15,
+    "thr_fpr1": 8.72409439086914,
+    "val_recall_fpr1": 0.43,
+    "val_auroc": 0.8987405481096219
+   },
+   {
+    "rows": 26,
+    "cols": 1,
+    "thr_fpr1": 17.58684730529785,
+    "val_recall_fpr1": 0.01,
+    "val_auroc": 0.745750150030006
+   },
+   {
+    "rows": 26,
+    "cols": 2,
+    "thr_fpr1": 16.724042892456055,
+    "val_recall_fpr1": 0.008,
+    "val_auroc": 0.7711890378075615
+   },
+   {
+    "rows": 26,
+    "cols": 5,
+    "thr_fpr1": 10.167167663574219,
+    "val_recall_fpr1": 0.3195,
+    "val_auroc": 0.8132933586717344
+   },
+   {
+    "rows": 26,
+    "cols": 10,
+    "thr_fpr1": 9.539101600646973,
+    "val_recall_fpr1": 0.317,
+    "val_auroc": 0.8393215643128625
+   },
+   {
+    "rows": 26,
+    "cols": 15,
+    "thr_fpr1": 8.606061935424805,
+    "val_recall_fpr1": 0.3395,
+    "val_auroc": 0.8684035807161432
+   }
+  ],
+  "rows": 1,
+  "cols": 15,
+  "thr_fpr1": 9.506091117858887,
+  "thr_fpr01": 10.395127296447754
+ },
+ "B": {
+  "candidates": [
+   {
+    "rows": 1,
+    "cols": 1,
+    "thr_fpr1": 13.224662780761719,
+    "val_recall_fpr1": 0.0095,
+    "val_auroc": 0.7766464292858571
+   },
+   {
+    "rows": 1,
+    "cols": 2,
+    "thr_fpr1": 11.925556182861328,
+    "val_recall_fpr1": 0.0105,
+    "val_auroc": 0.810626725345069
+   },
+   {
+    "rows": 1,
+    "cols": 5,
+    "thr_fpr1": 7.003462791442871,
+    "val_recall_fpr1": 0.3095,
+    "val_auroc": 0.8749133826765353
+   },
+   {
+    "rows": 1,
+    "cols": 10,
+    "thr_fpr1": 5.690351486206055,
+    "val_recall_fpr1": 0.493,
+    "val_auroc": 0.8987150430086017
+   },
+   {
+    "rows": 1,
+    "cols": 15,
+    "thr_fpr1": 5.105556488037109,
+    "val_recall_fpr1": 0.5165,
+    "val_auroc": 0.9184285857171435
+   },
+   {
+    "rows": 6,
+    "cols": 1,
+    "thr_fpr1": 12.331496238708496,
+    "val_recall_fpr1": 0.007,
+    "val_auroc": 0.7746661332266453
+   },
+   {
+    "rows": 6,
+    "cols": 2,
+    "thr_fpr1": 11.431449890136719,
+    "val_recall_fpr1": 0.0095,
+    "val_auroc": 0.8079561912382477
+   },
+   {
+    "rows": 6,
+    "cols": 5,
+    "thr_fpr1": 6.596119403839111,
+    "val_recall_fpr1": 0.2825,
+    "val_auroc": 0.872748549709942
+   },
+   {
+    "rows": 6,
+    "cols": 10,
+    "thr_fpr1": 5.384393215179443,
+    "val_recall_fpr1": 0.4865,
+    "val_auroc": 0.897132826565313
+   },
+   {
+    "rows": 6,
+    "cols": 15,
+    "thr_fpr1": 4.842581748962402,
+    "val_recall_fpr1": 0.508,
+    "val_auroc": 0.9178154630926185
+   },
+   {
+    "rows": 13,
+    "cols": 1,
+    "thr_fpr1": 12.010971069335938,
+    "val_recall_fpr1": 0.009,
+    "val_auroc": 0.7604415883176635
+   },
+   {
+    "rows": 13,
+    "cols": 2,
+    "thr_fpr1": 11.181766510009766,
+    "val_recall_fpr1": 0.009,
+    "val_auroc": 0.7922356471294258
+   },
+   {
+    "rows": 13,
+    "cols": 5,
+    "thr_fpr1": 6.425685405731201,
+    "val_recall_fpr1": 0.262,
+    "val_auroc": 0.8556772354470894
+   },
+   {
+    "rows": 13,
+    "cols": 10,
+    "thr_fpr1": 5.288497447967529,
+    "val_recall_fpr1": 0.4455,
+    "val_auroc": 0.8810464092818564
+   },
+   {
+    "rows": 13,
+    "cols": 15,
+    "thr_fpr1": 4.797614097595215,
+    "val_recall_fpr1": 0.46,
+    "val_auroc": 0.9050347069413883
+   },
+   {
+    "rows": 26,
+    "cols": 1,
+    "thr_fpr1": 11.611474990844727,
+    "val_recall_fpr1": 0.0085,
+    "val_auroc": 0.7439063812762553
+   },
+   {
+    "rows": 26,
+    "cols": 2,
+    "thr_fpr1": 10.880697250366211,
+    "val_recall_fpr1": 0.009,
+    "val_auroc": 0.7721624324864973
+   },
+   {
+    "rows": 26,
+    "cols": 5,
+    "thr_fpr1": 6.191535472869873,
+    "val_recall_fpr1": 0.219,
+    "val_auroc": 0.8144659931986398
+   },
+   {
+    "rows": 26,
+    "cols": 10,
+    "thr_fpr1": 5.2386698722839355,
+    "val_recall_fpr1": 0.345,
+    "val_auroc": 0.843620424084817
+   },
+   {
+    "rows": 26,
+    "cols": 15,
+    "thr_fpr1": 4.739338397979736,
+    "val_recall_fpr1": 0.3725,
+    "val_auroc": 0.8732264452890578
+   }
+  ],
+  "rows": 1,
+  "cols": 15,
+  "thr_fpr1": 5.105556488037109,
+  "thr_fpr01": 5.576310634613037
+ }
+}

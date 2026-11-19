@@ -1,12 +1,12 @@
 """시험장 부정 기기 신호 이상 탐지 PoC 공통 정의 (2026-11-18).
 
-스냅샷 한 장 = 20 MS/s IQ 20 ms(400,000 표본) → 스펙트로그램 → 주파수 256줄 × 시간 97칸 → 잡음 바닥 기준 dB → 고정 눈금 uint8 이미지.
+스냅샷 한 장 = 20 MS/s IQ 20 ms(400,000 표본) → 스펙트로그램 → 주파수 256줄 × 시간 97칸 → 배경 잡음 세기 기준 dB → 고정 눈금 uint8 이미지.
   - 수신 조건: HackRF One, 중심 2,449.5 MHz, 폭 20 MHz(2,439.5–2,459.5 MHz), 20 MS/s.
   - 배경 노이즈 = 공원에서 드론·조종기를 끄고 받은 IQ 데이터 3초(rf-drone-detector 저장소 릴리스 hackrf_1_train_background.tar 의
     3_neo2_park/02_telescopic_OFF_near1m 세션, CC BY 4.0)에서 블루투스 모양 덩어리를 지운 것.
     data/background/Park02_{1,2,3}.npy (1초씩, complex64, 이 저장소 릴리스에서 내려받음): 1 = 학습셋, 2 = 검증셋, 3 = 테스트셋.
     세 파일은 시간이 겹치지 않는다.
-  - SNR = 신호의 1 Hz 당 세기가 잡음 바닥의 1 Hz 당 세기보다 몇 dB 큰가 (rf-drone-detector 저장소의 IQ 합성 코드와 같은 정의).
+  - SNR = 신호의 1 Hz 당 세기가 배경 잡음 세기의 1 Hz 당 세기보다 몇 dB 큰가 (rf-drone-detector 저장소의 IQ 합성 코드와 같은 정의).
     SNR 0 dB 신호가 있는 칸은 잡음만 있는 칸보다 약 3 dB 밝다.
   - 이미지 밝기는 스냅샷마다 맞추지 않고 고정 눈금(-6 dB = 0, +34 dB = 255)을 쓴다. 픽셀차를 구하려면 스냅샷끼리 같은 눈금이어야 하기 때문이다
     (rf-drone-detector 의 그림 함수 to_image 는 스냅샷마다 1–99.5 백분위로 밝기를 맞추므로 여기서는 쓰지 않는다).
@@ -87,7 +87,7 @@ def band_burst(n, f_lo, f_hi, rng, rms):
 
 
 def rms_for(snr_db, bw):
-    """1 Hz 당 세기가 잡음 바닥(전력 1, 폭 FS)보다 snr_db 크도록 하는 덩어리 rms."""
+    """1 Hz 당 세기가 배경 잡음 세기(전력 1, 폭 FS)보다 snr_db 크도록 하는 덩어리 rms."""
     return float(np.sqrt(10 ** (snr_db / 10) / FS * bw))
 
 
@@ -173,3 +173,14 @@ def add_anomaly(x, rng, kind, snr_db):
             b = add_burst(x, rng, fc - a["bw"] / 2, fc + a["bw"] / 2, p0, p1, snr_db)
             if b: boxes.append((f"anom{kind}",) + b)
     return boxes, n_tx, len(boxes)
+
+
+# ---------------- 장소별 실험 (2026-11-19) ----------------
+# 환경 변수 EXAM_SITE 가 비어 있으면 11-18 실험 그대로(공원 배경, data/·runs/). indoor, indoor_droneoff, park 중 하나면
+# site_setup.py 의 그 장소 설정(중심 주파수, 배경 파일, 잡음 세기 맞추기, data/site/<장소>/·runs/site/<장소>/)으로 바꾼다.
+import os as _os
+SITE = _os.environ.get("EXAM_SITE", "")
+SITE_NAME = ""
+if SITE:
+    import site_setup as _site_setup
+    _site_setup.apply(globals())
