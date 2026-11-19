@@ -94,8 +94,10 @@ rf-exam-anomaly-poc/
 │   ├── background/      background IQ files: park Park02_1–3.npy (this release), indoor/ and indoor_droneoff/ (made by site_setup.py)
 │   └── raw/hackrf/      raw indoor IQ data (from hackrf_3_test_indoor.tar in the rf-drone-detector release)
 ├── doc/                 four write-ups, figures (fig/ experiment 1, fig/site/ experiment 2), prior-work survey
-├── models/              experiment 1 models: 3 CNNs, 3 CAEs, normal statistics, thresholds, ensemble scaling
+├── models/              experiment 1 models (3 CNNs, 3 CAEs, normal statistics, thresholds, ensemble scaling)
+│   └── site/            experiment 2 site folders (per site: 9 CAEs, normal statistics, background noise level, thresholds)
 ├── results/             experiment 1 reference results; results/site/ experiment 2 reference results
+├── sites/               site folders you train for new sites (site_train.py output, not tracked)
 ├── src/                 training and evaluation code, inference pipeline
 ├── requirements.txt
 └── LICENSE
@@ -141,7 +143,63 @@ python src/site_setup.py            # data/background/indoor/01–05.npy, data/b
 | indoor (drone off) | 2_neo2_indoor/20261008_drone_off | 2,450.5 | files 1–3 | file 4 | file 5 |
 | park | 3_neo2_park/02_telescopic_OFF_near1m | 2,449.5 | file 1 | file 2 | file 3 |
 
-## Usage 1: experiment 2 (per-site training)
+## Usage 1: a new site (train, set thresholds, infer)
+
+Record IQ data at the site in the normal state (no device), train the site's model on it, then score data recorded during the exam with that model. Two commands:
+
+```
+python src/site_train.py --out sites/study_cafe --normal normal_capture.cs8     # train, pick kernels and thresholds, save the site folder
+python src/predict.py --site sites/study_cafe --iq exam_capture.cs8             # same preprocessing as in training, then decisions and alarms
+```
+
+site_train.py follows the experiment 2 rules, without synthetic normal signals (real site data already contains the site's normal traffic):
+
+1. Split the normal data in time order: first 75 % training, last 25 % validation.
+2. Measure the background noise level on the training part, divide all data by it, and turn 20 ms pieces into 256 × 97 snapshots.
+3. Fit the per-pixel statistics and kernel of (B) normal-mean difference.
+4. Train the CAE(s); pick the epoch by validation reconstruction error and the kernel with shapeless rectangles added to validation snapshots.
+5. Save the top 0.1 % and top 1 % of the validation normal scores as decision thresholds.
+
+The site folder holds site.json (background noise level, kernels, thresholds, training log), pixel_stats.npz and cae<size>_s<seed>.pt. predict.py --site divides new IQ data by the stored noise level, so keep the receiver and its settings (center frequency, 20 MS/s, gain) the same as in training.
+
+| site_train.py option | Default | Meaning |
+|---|---|---|
+| `--normal FILE ...` | (required) | normal IQ data of the site, in recording order; same formats as predict.py (.npy, .cf32, .cs8, .sigmf-data) |
+| `--out DIR` | (required) | site folder |
+| `--layout` | chunks | chunks = concatenated 20 ms pieces (predict.py input format), continuous = gap-free recordings (random 20 ms crops) |
+| `--sizes` | 65k | CAE sizes (any of 65k, 21k, 6k): 65,265, 21,121 or 6,489 parameters |
+| `--seeds` | 0 | CAE seeds (one or more) |
+| `--epochs` | 20 | training epochs |
+| `--val-frac` | 0.25 | fraction at the end used for validation |
+| `--n-train`, `--n-val` | 10000, 5000 | snapshots cropped with continuous; with chunks, --n-train sets the training amount per epoch |
+
+| predict.py --site option | Default | Meaning |
+|---|---|---|
+| `--model` | cae | cae or pixel ((B) normal-mean difference) |
+| `--cae` | default_cae in site.json | which CAE, e.g. 65k_s0, 21k_s0 |
+| `--fpr` | 0.001 | 0.001 = top 0.1 % of the validation normal scores as threshold, 0.01 = top 1 % |
+| `--k`, `--n` | 2, 10 | alarm when k of the last n snapshots are anomalous |
+| `--noise-ref FILE` | none | re-measure the noise level on this normal data instead of using the stored value |
+
+The amount of normal data matters. The top 0.1 % threshold needs at least 1,000 validation snapshots, i.e. the last 25 % alone must hold 1,000 or more. At one snapshot per second that takes over an hour, so record the normal data with several 20 ms pieces per second (e.g. every 0.1 s): 10 minutes then give 6,000 snapshots. site_train.py warns when there are fewer than 1,000 validation snapshots.
+
+**End-to-end check on real IQ data:** trained on indoor (10-07) 1 s files 1–4 and scored file 5, which was not used in training. Training all three CAE sizes took 217 s (NVIDIA DGX Spark, including 44 s of snapshot generation).
+
+```
+H=data/raw/hackrf/1_nodrone_indoor/20261007_antenna_on/recordings
+python src/site_train.py --layout continuous --out sites/indoor --sizes 65k 21k 6k --normal $H/0[1-4]/*.cs8
+python src/make_site_demo_iq.py --background $H/05/*.cs8 --out data/site_demo_iq.npy --kind 1 --snr 9
+python src/predict.py --site sites/indoor --iq data/site_demo_iq.npy
+```
+
+| Check | CAE, 65,265 parameters | (B) normal-mean difference |
+|---|---|---|
+| file 5 as recorded (50 normal 20 ms pieces) | 3 flagged, 1 alarm | 2 flagged, 1 alarm |
+| 1 min (60 pieces) from file 5 with an earphone-type anomaly (SNR 9 dB) in pieces 20–29 | alarm 21–37 s on the anomaly, 1 false alarm in the normal part (45–50 s) | alarm 21–37 s on the anomaly, 2 false alarms (9–18 s, 46–52 s) |
+
+An alarm stays on until 10 snapshots after the last anomalous one, so it ends at 37 s. The false alarms in the normal part come from having only 3 s of training data, the same limitation as in experiment 2. The experiment 2 models are in models/site/ in the same site-folder format (`python src/predict.py --site models/site/indoor --iq ...`). The park folder's noise level is in the units of this release's Park02_*.npy files, so pass `--noise-ref` for other park recordings.
+
+## Usage 2: reproduce experiment 2 (per-site training)
 
 ```
 bash src/run_sites.sh
@@ -163,7 +221,7 @@ The steps below run for each of the three sites, followed by the cross-site eval
 - Compare runs/site/results.md with the reference results in results/site/results.md.
 - The two explanatory figures of the write-up: `EXAM_SITE=park python src/site_figures.py snr`, `EXAM_SITE=indoor python src/site_figures.py dense`.
 
-## Usage 2: experiment 1 (one park background)
+## Usage 3: reproduce experiment 1 (one park background)
 
 ```
 bash src/run_all.sh                         # everything, about 30 min on one GPU
@@ -182,9 +240,9 @@ bash src/run_all.sh --use-released-models   # skip training, score with models/ 
 
 Use `PY=/path/python` to choose the interpreter and `WORKERS` (default 16) for data generation (also for run_sites.sh). Existing data/*.npy files are reused. After retraining, `python src/export_models.py` copies the new models into models/.
 
-## Usage 3: inference pipeline (experiment 1 models)
+## Usage 4: inference with the experiment 1 models
 
-src/predict.py runs with the files in models/ only. models/ holds the experiment 1 (park) models. To work the way experiment 2 does, retrain on normal data from the new site; there is no inference script yet that loads per-site models. To get just the trained models and the inference code, download rf-exam-anomaly-inference-v1.0.zip (2.6 MB) from the release. Try it on a demo IQ file (1 min, earphone-type anomaly at SNR 6 dB in seconds 20–29):
+Without --site, src/predict.py scores with the experiment 1 (park) models in models/. For a new site, use a site folder trained on that site's data (Usage 1). To get only the trained models and code, download a release file: rf-exam-anomaly-inference-v1.0.zip (2.6 MB, experiment 1) in v1.0, or rf-exam-anomaly-site-v2.0.zip (experiment 2 and new-site training) in v2.0. Try it on a demo IQ file (1 min, earphone-type anomaly at SNR 6 dB in seconds 20–29):
 
 ```
 python src/make_demo_iq.py
@@ -208,7 +266,7 @@ python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy 
 | `--interval` | 1.0 | seconds between snapshots (time column only) |
 | `--out` | runs/predict.csv | output CSV: index, time_s, score, threshold, anomaly, alarm |
 
-For your own recordings, keep the receiver settings of the training data (HackRF, 2,449.5 MHz, 20 MS/s, fixed gain) and give a normal reference with `--noise-ref`. As experiment 2 shows, the FPR changes a lot between sites: retrain and re-set thresholds on normal data from the new site.
+For your own recordings, keep the receiver settings of the training data (HackRF, 2,449.5 MHz, 20 MS/s, fixed gain) and give a normal reference with `--noise-ref`. As experiment 2 shows, the FPR changes a lot between sites: for a new site, retrain on that site's normal data (Usage 1).
 
 ## Reproducibility
 

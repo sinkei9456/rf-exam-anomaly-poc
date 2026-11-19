@@ -94,8 +94,10 @@ rf-exam-anomaly-poc/
 │   ├── background/      배경 IQ 파일: 공원 Park02_1–3.npy(이 저장소 릴리스), 실내 두 장소 indoor/, indoor_droneoff/(site_setup.py가 만듦)
 │   └── raw/hackrf/      실내 원본 IQ 데이터(rf-drone-detector 릴리스의 hackrf_3_test_indoor.tar를 풀면 생김)
 ├── doc/                 문서 네 개, 그림(fig/ 첫 번째 실험, fig/site/ 두 번째 실험), 선행 조사
-├── models/              첫 번째 실험의 학습된 모델: CNN 3개, CAE 3개, 정상 통계, threshold, 앙상블 눈금
+├── models/              첫 번째 실험의 학습된 모델(CNN 3개, CAE 3개, 정상 통계, threshold, 앙상블 눈금)
+│   └── site/            두 번째 실험의 장소 폴더 3개(장소마다 CAE 9개, 정상 통계, 배경 잡음 세기, 판정 임계값)
 ├── results/             첫 번째 실험의 기준 결과, results/site/ 두 번째 실험의 기준 결과(재현할 때 비교용)
+├── sites/               새 장소에서 학습한 장소 폴더를 두는 곳(site_train.py 출력, 저장소에는 올리지 않음)
 ├── src/                 학습·평가 코드, 추론 파이프라인
 ├── requirements.txt
 └── LICENSE
@@ -143,7 +145,63 @@ python src/site_setup.py            # data/background/indoor/01–05.npy, data/b
 | 실내(드론 끔) | 2_neo2_indoor/20261008_drone_off | 2,450.5 | 파일 1–3 | 파일 4 | 파일 5 |
 | 공원 | 3_neo2_park/02_telescopic_OFF_near1m | 2,449.5 | 파일 1 | 파일 2 | 파일 3 |
 
-## 사용법 1: 두 번째 실험(장소별 학습)
+## 사용법 1: 새 장소에 쓰기(학습 → 판정 임계값 → 추론)
+
+시험 장소에서 기기가 없는 정상 상태의 IQ 데이터를 먼저 받아 그 장소 모델을 학습하고, 시험 중 받은 IQ 데이터를 그 모델로 판정합니다. 명령 두 줄입니다.
+
+```
+python src/site_train.py --out sites/study_cafe --normal normal_capture.cs8     # 학습, 커널·판정 임계값 선택, 장소 폴더 저장
+python src/predict.py --site sites/study_cafe --iq exam_capture.cs8             # 학습 때와 같은 전처리로 판정·경보
+```
+
+site_train.py가 차례로 하는 일은 다음과 같습니다. 두 번째 실험과 같은 규칙이고, 합성 정상 신호는 넣지 않습니다(실제 장소 데이터에 그 장소의 정상 신호가 이미 들어 있으므로).
+
+1. 정상 데이터를 시간 순서대로 나눕니다. 앞 75 %는 학습셋, 뒤 25 %는 검증셋입니다.
+2. 학습셋으로 배경 잡음 세기를 재고, 모든 데이터를 그 값으로 나눠 스냅샷(256 × 97)으로 바꿉니다.
+3. (나) 정상 평균과의 픽셀 차이의 통계와 커널을 정합니다.
+4. CAE를 학습합니다. 에포크는 검증셋 정상 재구성 오차로, 커널은 검증셋에 넣은 모양 없는 사각형 패턴으로 고릅니다.
+5. 판정 임계값으로 검증셋 정상 이상 점수의 상위 0.1 % 값과 상위 1 % 값을 저장합니다.
+
+장소 폴더에는 site.json(배경 잡음 세기, 커널, 판정 임계값, 학습 기록), pixel_stats.npz, cae<크기>_s<시드>.pt가 생깁니다. predict.py --site는 새 IQ 데이터를 이 폴더의 배경 잡음 세기로 나누므로, 수신기와 수신 설정(중심 주파수, 20 MS/s, 이득)을 학습 때와 같게 둬야 합니다.
+
+| site_train.py 옵션 | 기본값 | 내용 |
+|---|---|---|
+| `--normal 파일 …` | (필수) | 그 장소의 정상 IQ 데이터. 받은 순서대로 줍니다. 형식은 predict.py와 같습니다(.npy, .cf32, .cs8, .sigmf-data) |
+| `--out 폴더` | (필수) | 장소 폴더 |
+| `--layout` | chunks | chunks는 20 ms 조각을 이어 붙인 파일(predict.py 입력과 같은 형식), continuous는 끊김 없이 받은 파일(20 ms를 무작위로 자름) |
+| `--sizes` | 65k | CAE 크기(65k, 21k, 6k 중 여러 개 가능). 파라미터는 65,265개, 21,121개, 6,489개 |
+| `--seeds` | 0 | CAE 시드(여러 개 가능) |
+| `--epochs` | 20 | 학습 에포크 |
+| `--val-frac` | 0.25 | 검증셋으로 쓸 뒷부분의 비율 |
+| `--n-train`, `--n-val` | 10000, 5000 | continuous일 때 자르는 스냅샷 수. chunks일 때 --n-train은 에포크당 학습량 |
+
+| predict.py --site 옵션 | 기본값 | 내용 |
+|---|---|---|
+| `--model` | cae | cae 또는 pixel((나) 정상 평균과의 픽셀 차이) |
+| `--cae` | site.json의 default_cae | 쓸 CAE, 예: 65k_s0, 21k_s0 |
+| `--fpr` | 0.001 | 0.001이면 검증셋 정상 이상 점수의 상위 0.1 % 값, 0.01이면 상위 1 % 값을 판정 임계값으로 씀 |
+| `--k`, `--n` | 2, 10 | 최근 n장 중 k장 이상이 이상이면 경보 |
+| `--noise-ref 파일` | 없음 | 주면 장소 폴더의 배경 잡음 세기 대신 이 정상 데이터로 다시 잼 |
+
+정상 데이터의 길이가 중요합니다. 판정 임계값(상위 0.1 % 값)을 믿으려면 검증 스냅샷이 1,000장 이상 있어야 하므로, 검증용으로 쓸 뒤 25 %만 해도 1,000장 이상이 되어야 합니다. 1초에 한 장씩 받으면 1시간이 넘게 걸립니다. 그래서 정상 데이터를 받을 때는 20 ms 조각을 1초에 여러 번(예: 0.1초마다) 받기를 권합니다. 이렇게 받으면 10분에 6,000장이 됩니다. 검증 스냅샷이 1,000장보다 적으면 site_train.py가 경고합니다.
+
+**실제 IQ 데이터로 끝까지 시험한 결과:** 실내(10-07) 1초 파일 1–4로 학습하고, 학습에 쓰지 않은 파일 5로 추론했습니다. 학습은 CAE 세 크기를 합쳐 217초 걸렸습니다(NVIDIA DGX Spark, 스냅샷 만들기 44초 포함).
+
+```
+H=data/raw/hackrf/1_nodrone_indoor/20261007_antenna_on/recordings
+python src/site_train.py --layout continuous --out sites/indoor --sizes 65k 21k 6k --normal $H/0[1-4]/*.cs8
+python src/make_site_demo_iq.py --background $H/05/*.cs8 --out data/site_demo_iq.npy --kind 1 --snr 9
+python src/predict.py --site sites/indoor --iq data/site_demo_iq.npy
+```
+
+| 시험 | CAE, 파라미터 65,265개 | (나) 정상 평균과의 픽셀 차이 |
+|---|---|---|
+| 파일 5 그대로(정상 20 ms 조각 50개) | 이상 판정 3개, 경보 1번 | 이상 판정 2개, 경보 1번 |
+| 파일 5에서 1분(60조각)을 만들고 20–29번에 이어폰형 이상 신호(SNR 9 dB)를 넣음 | 이상 구간 경보 21–37초, 정상 구간 오경보 1번(45–50초) | 이상 구간 경보 21–37초, 정상 구간 오경보 2번(9–18초, 46–52초) |
+
+경보는 이상 판정이 끝난 뒤 10장이 지날 때까지 이어지므로 37초에 꺼집니다. 정상 구간의 오경보는 학습 데이터가 3초뿐이어서 생긴 것으로, 두 번째 실험의 실내 결과와 같은 한계입니다. 두 번째 실험의 모델은 models/site/에 같은 장소 폴더 형식으로 있습니다(`python src/predict.py --site models/site/indoor --iq …`). 공원 폴더의 배경 잡음 세기는 이 저장소 릴리스의 Park02_*.npy 단위라서, 다른 공원 IQ 파일에는 `--noise-ref`를 같이 줍니다.
+
+## 사용법 2: 두 번째 실험 재현(장소별 학습)
 
 ```
 bash src/run_sites.sh
@@ -165,7 +223,7 @@ bash src/run_sites.sh
 - 결과는 runs/site/results.md에 생깁니다. 기준 결과 results/site/results.md와 비교합니다.
 - 문서의 설명 그림 두 장은 `EXAM_SITE=park python src/site_figures.py snr`, `EXAM_SITE=indoor python src/site_figures.py dense`로 그립니다.
 
-## 사용법 2: 첫 번째 실험(공원 배경 하나)
+## 사용법 3: 첫 번째 실험 재현(공원 배경 하나)
 
 ```
 bash src/run_all.sh                         # 처음부터 다시 학습(GPU 1개에서 약 30분)
@@ -186,9 +244,9 @@ bash src/run_all.sh --use-released-models   # 학습 없이 models/의 모델로
 - 이미 있는 data/<데이터셋>.npy는 다시 만들지 않습니다. 처음부터 다시 하려면 data/의 .npy·.csv·_boxes.json 파일과 runs/를 지웁니다.
 - 다시 학습한 모델을 추론에 쓰려면 `python src/export_models.py`로 runs/의 모델을 models/로 내보냅니다.
 
-## 사용법 3: 추론 파이프라인(첫 번째 실험 모델)
+## 사용법 4: 첫 번째 실험 모델로 추론
 
-src/predict.py는 학습 코드를 돌리지 않고 models/의 파일만으로 추론합니다. models/에는 첫 번째 실험(공원 배경)의 모델이 있습니다. 두 번째 실험의 방식대로 쓰려면 새 장소의 정상 데이터로 모델을 다시 학습해야 하며, 장소별 모델을 불러 추론하는 코드는 아직 없습니다. 학습된 모델과 추론 코드만 따로 받으려면 릴리스의 rf-exam-anomaly-inference-v1.0.zip(2.6 MB)을 받아 풀면 됩니다.
+--site 없이 src/predict.py를 쓰면 models/의 첫 번째 실험(공원 배경) 모델로 추론합니다. 새 장소에는 사용법 1처럼 그 장소 데이터로 학습한 장소 폴더를 씁니다. 학습된 모델과 코드만 따로 받으려면 릴리스 파일을 받아 풉니다. 첫 번째 실험은 v1.0의 rf-exam-anomaly-inference-v1.0.zip(2.6 MB), 두 번째 실험과 새 장소 학습은 v2.0의 rf-exam-anomaly-site-v2.0.zip입니다.
 
 먼저 시험용 IQ 파일로 돌려 봅니다. 1분짜리 IQ 데이터에서 20–29초에만 이어폰형 이상 신호(SNR 6 dB)가 들어 있습니다.
 
@@ -201,7 +259,7 @@ python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy 
 화면에는 다음과 같이 나옵니다.
 
 ```
-(다) CNN 시드 0, threshold 2.8855(검증셋 정상의 0.1 %가 넘게 정한 값), 스냅샷 60장 중 이상 판정 6장
+(다) CNN 시드 0, 판정 임계값 2.8855(검증셋 정상 이상 점수의 상위 0.1 % 값), 스냅샷 60장 중 이상 판정 6장
 경보(최근 10장 중 2장 이상): 1번
   22–36초(스냅샷 22–36)
 결과 파일: runs/predict.csv
@@ -227,7 +285,7 @@ python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy 
 
 결과 파일(CSV)의 칸은 index(스냅샷 번호), time_s(시각, 초), score(이상 점수), threshold, anomaly(이상 판정, 0 또는 1), alarm(경보, 0 또는 1)입니다.
 
-직접 받은 IQ 데이터에 쓸 때는 수신 설정을 학습과 같게 둡니다(HackRF, 중심 주파수 2,449.5 MHz, 20 MS/s, 이득 고정). `--noise-ref`로 정상 상태의 IQ 데이터를 주면 그 평균 전력으로 잡음 세기를 맞춥니다. 두 번째 실험에서 보았듯이 장소가 바뀌면 FPR이 크게 달라지므로, 새 장소에서는 그 장소의 정상 데이터로 다시 학습하고 threshold를 다시 정해야 합니다.
+직접 받은 IQ 데이터에 쓸 때는 수신 설정을 학습과 같게 둡니다(HackRF, 중심 주파수 2,449.5 MHz, 20 MS/s, 이득 고정). `--noise-ref`로 정상 상태의 IQ 데이터를 주면 그 평균 전력으로 잡음 세기를 맞춥니다. 두 번째 실험에서 보았듯이 장소가 바뀌면 FPR이 크게 달라지므로, 새 장소에서는 사용법 1처럼 그 장소의 정상 데이터로 다시 학습합니다.
 
 ## 재현 확인
 

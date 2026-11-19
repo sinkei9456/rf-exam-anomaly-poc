@@ -1,4 +1,11 @@
-"""학습된 모델로 이상 탐지 추론 (2026-11-18). 학습 코드를 돌리지 않고 models/ 의 파일만으로 쓴다. GPU 가 없으면 CPU 로 돈다.
+"""학습된 모델로 이상 탐지 추론 (2026-11-18, 장소 폴더 추론 2026-11-19). 학습 코드를 돌리지 않고 모델 파일만으로 쓴다. GPU 가 없으면 CPU 로 돈다.
+
+두 가지 방식:
+  --site DIR  (두 번째 실험 방식, 새 장소에 쓰는 방법) src/site_train.py 가 그 장소의 정상 IQ 데이터로 만든 장소 폴더를 읽는다.
+              새 IQ 데이터를 그 폴더에 적힌 배경 잡음 세기로 나누고(학습 때와 같은 전처리) 그 장소의 CAE 나 (나) 픽셀 차이로 판정한다.
+              --model cae(기본) | pixel, --cae 65k_s0 처럼 CAE 크기·시드를 고른다(기본은 site.json 의 default_cae).
+              --noise-ref 를 주면 폴더의 배경 잡음 세기 대신 그 데이터로 다시 잰다.
+  (--site 없음) 첫 번째 실험 방식. 아래 models/ 의 공원 배경 모델을 쓴다.
 
 필요한 파일(models/):
   cnn_s0.pt, cnn_s1.pt, cnn_s2.pt   (다) CNN 가중치(시드 0·1·2)
@@ -29,6 +36,8 @@
 화면에는 이상으로 판정한 스냅샷 수와 경보가 울린 시간 범위를 적는다.
 
 예:
+  python src/predict.py --site sites/indoor --iq new_capture.cs8
+  python src/predict.py --site sites/indoor --iq new_capture.cs8 --model pixel
   python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy
   python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy --model cae
   python src/predict.py --iq data/demo_iq.npy --noise-ref data/demo_noise_ref.npy --model ens
@@ -108,18 +117,37 @@ def pixel_scores(u8, mu, sd, rows, cols):
 
 
 # ---------------- IQ 읽기 ----------------
-def read_iq(path):
+class Int8IQ:
+    """HackRF int8 IQ 파일(I·Q 번갈아)을 복소수 배열처럼 쓴다. 메모리에 다 올리지 않고 자른 부분만 complex64 로 바꾼다(÷ 128)."""
+    def __init__(self, p):
+        self.r = np.memmap(p, dtype=np.int8, mode="r"); self.n = len(self.r) // 2
+
+    def __len__(self):
+        return self.n
+
+    def __getitem__(self, s):
+        a, b, st = s.indices(self.n)
+        if st != 1: raise ValueError("Int8IQ 는 연속 구간만 자를 수 있음")
+        r = np.asarray(self.r[2 * a: 2 * b], dtype=np.float32)
+        return ((r[0::2] + 1j * r[1::2]) / 128).astype(np.complex64)
+
+
+def open_iq(path):
+    """IQ 파일을 연다. .npy(복소수)·.cf32(complex64)는 mmap, .cs8·.sigmf-data(HackRF int8)는 int8 ÷ 128.
+    장소 폴더의 배경 잡음 세기도 이 방식으로 읽은 값의 단위다."""
     p = Path(path)
     if p.suffix == ".npy":
         x = np.load(p, mmap_mode="r")
         if not np.iscomplexobj(x): raise SystemExit(f"{p}: 복소수 배열이 아님")
         return x
     if p.suffix == ".cf32":
-        return np.fromfile(p, dtype=np.complex64)
+        return np.memmap(p, dtype=np.complex64, mode="r")
     if p.suffix in (".cs8", ".sigmf-data"):
-        r = np.fromfile(p, dtype=np.int8).astype(np.float32)
-        return (r[0::2] + 1j * r[1::2]).astype(np.complex64)
+        return Int8IQ(p)
     raise SystemExit(f"{p}: 읽을 수 없는 형식(.npy, .cf32, .cs8, .sigmf-data)")
+
+
+read_iq = open_iq
 
 
 def chunks(x):
@@ -174,6 +202,45 @@ def episodes(a):
     return out
 
 
+def report(s, thr, name, args):
+    """판정, 경보, CSV 저장, 화면 출력."""
+    flags = s > thr; a = alarms(flags, args.k, args.n)
+    out = Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("index,time_s,score,threshold,anomaly,alarm\n")
+        for i in range(len(s)): f.write(f"{i},{i * args.interval:.3f},{s[i]:.5f},{thr:.5f},{int(flags[i])},{int(a[i])}\n")
+    ep = episodes(a)
+    print(f"{name}, 판정 임계값 {thr:.4f}(검증셋 정상 이상 점수의 상위 {args.fpr * 100:g} % 값), 스냅샷 {len(s)}장 중 이상 판정 {int(flags.sum())}장")
+    print(f"경보(최근 {args.n}장 중 {args.k}장 이상): {len(ep)}번" + "".join(f"\n  {a0 * args.interval:g}–{a1 * args.interval:g}초(스냅샷 {a0}–{a1})" for a0, a1 in ep))
+    print(f"결과 파일: {out}")
+    return s, flags, a
+
+
+def load_site(d):
+    """장소 폴더(src/site_train.py 출력): site.json, pixel_stats.npz, cae<크기>_s<시드>.pt"""
+    d = Path(d)
+    if not (d / "site.json").exists(): raise SystemExit(f"{d}: site.json 이 없음. 먼저 python src/site_train.py 로 장소 폴더를 만들 것")
+    st = np.load(d / "pixel_stats.npz")
+    return json.load(open(d / "site.json", encoding="utf-8")), st["mu"].astype(np.float32), st["sd"].astype(np.float32)
+
+
+def predict_site(u8, args, d, meta, mu, sd):
+    key = "0.001" if args.fpr == 0.001 else "0.01"
+    if args.model == "pixel":
+        p = meta["pixel"]; s = pixel_scores(u8, mu, sd, p["rows"], p["cols"]); thr = p["thr"][key]
+        name = f"장소 {meta['name']}: (나) 정상 평균과의 픽셀 차이"
+    else:
+        import torch
+        from cae import CAE
+        k = args.cae or meta["default_cae"]
+        if k not in meta["cae"]: raise SystemExit(f"--cae {k} 가 장소 폴더에 없음. 있는 것: {', '.join(meta['cae'])}")
+        m = meta["cae"][k]; dev = device(); net = CAE(tuple(m["channels"]))
+        net.load_state_dict(torch.load(Path(d) / m["file"], map_location=dev)); net.to(dev).eval()
+        s = cae_scores(net, u8, mu, sd, m["rows"], m["cols"], dev); thr = m["thr"][key]
+        name = f"장소 {meta['name']}: CAE 파라미터 {m['n_params']:,}개(시드 {m['seed']})"
+    return report(s, thr, name, args)
+
+
 def predict(u8, args):
     mu, sd, meta = load_meta(); key = "0.001" if args.fpr == 0.001 else "0.01"
     if args.model == "cnn":
@@ -190,16 +257,7 @@ def predict(u8, args):
         s = combine(sc, se, e); thr = e["thr"][key]; name = f"(마) CNN·CAE 앙상블 시드 {args.seed}"
     else:
         p = meta["pixel"]; s = pixel_scores(u8, mu, sd, p["rows"], p["cols"]); thr = p["thr"][key]; name = "(나) 정상 평균과의 픽셀차"
-    flags = s > thr; a = alarms(flags, args.k, args.n)
-    out = Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        f.write("index,time_s,score,threshold,anomaly,alarm\n")
-        for i in range(len(s)): f.write(f"{i},{i * args.interval:.3f},{s[i]:.5f},{thr:.5f},{int(flags[i])},{int(a[i])}\n")
-    ep = episodes(a)
-    print(f"{name}, threshold {thr:.4f}(검증셋 정상의 {args.fpr * 100:g} %가 넘게 정한 값), 스냅샷 {len(s)}장 중 이상 판정 {int(flags.sum())}장")
-    print(f"경보(최근 {args.n}장 중 {args.k}장 이상): {len(ep)}번" + "".join(f"\n  {a0 * args.interval:.0f}–{a1 * args.interval:.0f}초(스냅샷 {a0}–{a1})" for a0, a1 in ep))
-    print(f"결과 파일: {out}")
-    return s, flags, a
+    return report(s, thr, name, args)
 
 
 def eval_sets():
@@ -230,12 +288,17 @@ def main():
     ap = argparse.ArgumentParser(description="학습된 모델로 이상 탐지 추론")
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--iq"); g.add_argument("--snapshots"); g.add_argument("--eval-sets", action="store_true")
-    ap.add_argument("--noise-ref"); ap.add_argument("--model", choices=["cnn", "cae", "ens", "pixel"], default="cnn")
+    ap.add_argument("--noise-ref"); ap.add_argument("--model", choices=["cnn", "cae", "ens", "pixel"], default=None,
+                    help="기본: --site 가 있으면 cae, 없으면 cnn. --site 에서는 cae·pixel 만 쓴다")
+    ap.add_argument("--site", help="src/site_train.py 가 만든 장소 폴더"); ap.add_argument("--cae", help="--site 에서 쓸 CAE, 예: 65k_s0")
     ap.add_argument("--seed", type=int, choices=[0, 1, 2], default=0); ap.add_argument("--fpr", type=float, choices=[0.001, 0.01], default=0.001)
     ap.add_argument("--k", type=int, default=2); ap.add_argument("--n", type=int, default=10)
     ap.add_argument("--interval", type=float, default=1.0); ap.add_argument("--out", default=str(C.RUNS / "predict.csv"))
     args = ap.parse_args()
+    if args.model is None: args.model = "cae" if args.site else "cnn"
+    if args.site and args.model not in ("cae", "pixel"): raise SystemExit("--site 에서는 --model cae 또는 pixel 만 쓴다")
     if args.eval_sets: return eval_sets()
+    site = load_site(args.site) if args.site else None
     if args.snapshots:
         u8 = np.load(args.snapshots)
         if u8.dtype != np.uint8 or u8.shape[1:] != (C.NF, C.NT): raise SystemExit(f"스냅샷 형식이 다름: {u8.dtype} {u8.shape}, 필요한 것 uint8 (장수, {C.NF}, {C.NT})")
@@ -243,10 +306,13 @@ def main():
         x = read_iq(args.iq)
         if args.noise_ref:
             noise = noise_power_ref(read_iq(args.noise_ref)); print(f"잡음 전력(기준 데이터 {args.noise_ref}): {noise:.4g}")
+        elif site:
+            noise = site[0]["noise_power"]; print(f"배경 잡음 세기(장소 폴더 {args.site}, 학습 때 잰 값): {noise:.4g}")
         else:
             noise = noise_power_self(x)
             print(f"경고: --noise-ref 가 없어 입력에서 잡음 전력을 추정함({noise:.4g}). 시험 전 같은 장소에서 받은 정상 IQ 데이터를 주는 것을 권장", flush=True)
         u8 = iq_to_snapshots(x, noise)
+    if site: return predict_site(u8, args, args.site, *site)
     predict(u8, args)
 
 
