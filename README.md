@@ -181,7 +181,7 @@ The site folder holds site.json (background noise level, kernels, thresholds, tr
 | `--k`, `--n` | 2, 10 | alarm when k of the last n snapshots are anomalous |
 | `--noise-ref FILE` | none | re-measure the noise level on this normal data instead of using the stored value |
 
-The amount of normal data matters. The top 0.1 % threshold needs at least 1,000 validation snapshots, i.e. the last 25 % alone must hold 1,000 or more. At one snapshot per second that takes over an hour, so record the normal data with several 20 ms pieces per second (e.g. every 0.1 s): 10 minutes then give 6,000 snapshots. site_train.py warns when there are fewer than 1,000 validation snapshots.
+**Record about 30 minutes of normal data (at least 10).** With a 20 ms piece every 0.1 s, 30 minutes give about 18,000 snapshots (about 14 GB as HackRF .cs8) and 10 minutes give 6,000 (about 4.8 GB). One piece per second leaves too few validation snapshots (the last 25 %) to set the threshold, so record several pieces per second. site_train.py warns when there are fewer than 1,000 validation snapshots.
 
 **End-to-end check on real IQ data:** trained on indoor (10-07) 1 s files 1–4 and scored file 5, which was not used in training. Training all three CAE sizes took 217 s (NVIDIA DGX Spark, including 44 s of snapshot generation).
 
