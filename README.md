@@ -209,7 +209,7 @@ The steps below run for each of the three sites, followed by the cross-site eval
 
 | Step | Script | What it does | Time per site |
 |---|---|---|---:|
-| 1 | src/make_data.py | synthesize 41,400 snapshots (data/site/<site>/, about 1.0 GB) | ~1 min 40 s |
+| 1 | src/make_data.py | synthesize 41,400 snapshots (training 10,000, validation 7,000, test 24,400; data/site/<site>/, about 1.0 GB) | ~1 min 40 s |
 | 2 | src/pixeldiff.py | (A)(B): pick smoothing size and thresholds on the validation set, score | ~20 s |
 | 3 | src/cae.py --size 65k, 21k, 6k | train the three CAE sizes, 3 seeds each | ~9 min |
 | 4 | src/site_evaluate.py | test-set evaluation, model size and timing, appendix figures (doc/fig/site/) | ~10 s |
@@ -230,7 +230,7 @@ bash src/run_all.sh --use-released-models   # skip training, score with models/ 
 
 | Step | Script | What it does | Time |
 |---|---|---|---:|
-| 1 | src/make_data.py | synthesize 55,000 snapshots (data/, 1.3 GB) | ~3 min |
+| 1 | src/make_data.py | synthesize 55,000 snapshots (training 20,000, validation 7,000, test 28,000; data/, 1.3 GB) | ~3 min |
 | 2 | src/pixeldiff.py | (A)(B): pick smoothing size and thresholds on the validation set, score | ~1 min |
 | 3 | src/cnn.py | (C) CNN training, 3 seeds | ~20 min |
 | 4 | src/cae.py | (D) CAE training, 3 seeds | ~5 min |

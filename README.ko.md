@@ -211,7 +211,7 @@ bash src/run_sites.sh
 
 | 단계 | 스크립트 | 하는 일 | 걸리는 시간 (장소당) |
 |---|---|---|---:|
-| 1 | src/make_data.py | 합성 스냅샷 41,400장 만들기(data/site/<장소>/, 약 1.0 GB) | 약 1분 40초 |
+| 1 | src/make_data.py | 합성 스냅샷 41,400장 만들기(학습셋 10,000, 검증셋 7,000, 테스트셋 24,400; data/site/<장소>/, 약 1.0 GB) | 약 1분 40초 |
 | 2 | src/pixeldiff.py | (가)(나)의 평활 크기와 threshold를 검증셋으로 정하고 점수 계산 | 약 20초 |
 | 3 | src/cae.py --size 65k, 21k, 6k | CAE 세 크기 × 시드 3개 학습 | 약 9분 |
 | 4 | src/site_evaluate.py | 테스트셋 평가, 가벼운 정도 측정, 부록 그림(doc/fig/site/) | 약 10초 |
@@ -232,7 +232,7 @@ bash src/run_all.sh --use-released-models   # 학습 없이 models/의 모델로
 
 | 단계 | 스크립트 | 하는 일 | 걸리는 시간 |
 |---|---|---|---:|
-| 1 | src/make_data.py | 합성 스냅샷 55,000장 만들기(data/, 1.3 GB) | 약 3분 |
+| 1 | src/make_data.py | 합성 스냅샷 55,000장 만들기(학습셋 20,000, 검증셋 7,000, 테스트셋 28,000; data/, 1.3 GB) | 약 3분 |
 | 2 | src/pixeldiff.py | (가)(나)의 평활 크기와 threshold를 검증셋으로 정하고 점수 계산 | 약 1분 |
 | 3 | src/cnn.py | (다) CNN 학습, 시드 3개 | 약 20분 |
 | 4 | src/cae.py | (라) CAE 학습, 시드 3개 | 약 5분 |
